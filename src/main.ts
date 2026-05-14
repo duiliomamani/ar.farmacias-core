@@ -4,16 +4,15 @@ import { ValidationPipe, INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { TransformInterceptor } from './infrastructure/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './infrastructure/filters/http-exception.filter';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
 
-const server = express();
+let app: INestApplication;
 
-async function createNestApp(expressInstance: express.Express): Promise<INestApplication> {
-  const app = await NestFactory.create(
-    AppModule,
-    new ExpressAdapter(expressInstance),
-  );
+async function createApp() {
+  if (app) {
+    return app;
+  }
+
+  app = await NestFactory.create(AppModule);
 
   // Enable CORS
   app.enableCors();
@@ -45,27 +44,22 @@ async function createNestApp(expressInstance: express.Express): Promise<INestApp
   return app;
 }
 
-// Singleton for Vercel
-let cachedApp: INestApplication;
-
-async function bootstrap() {
-  if (!cachedApp) {
-    cachedApp = await createNestApp(server);
-  }
-  return cachedApp;
-}
-
 // Local development
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  bootstrap().then(async (app) => {
-    const port = process.env.PORT ?? 3000;
-    await app.listen(port);
-    console.log(`Application is running on: http://localhost:${port}`);
-  });
+async function bootstrap() {
+  const application = await createApp();
+  const port = process.env.PORT ?? 5001;
+  await application.listen(port);
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
 }
 
-// Export for Vercel
-export default async (req: any, res: any) => {
-  await bootstrap();
-  server(req, res);
-};
+// Only bootstrap locally, not in Vercel
+if (process.env.VERCEL !== '1') {
+  bootstrap();
+}
+
+// Export for Vercel serverless
+export default async function handler(req: any, res: any) {
+  const application = await createApp();
+  const server = application.getHttpAdapter().getInstance();
+  return server(req, res);
+}

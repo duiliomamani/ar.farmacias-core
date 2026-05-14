@@ -19,5 +19,11 @@
         "OPTIONS"
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/scraping/colfarjuy",
+      "schedule": "0 4 * * *"
+    }
   ]
 }
