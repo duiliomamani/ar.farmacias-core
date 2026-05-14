@@ -114,7 +114,7 @@ describe('ColfarjuyScraperService', () => {
       expect(result).toContain('text from google drive');
     });
 
-    it('should detect Cloudflare challenge and log warning', async () => {
+    it('should detect Cloudflare challenge via title and log warning', async () => {
       const html = '<html><head><title>Just a moment...</title></head><body>Please enable cookies.</body></html>';
       mockPage.content.mockResolvedValue(html);
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
@@ -124,6 +124,37 @@ describe('ColfarjuyScraperService', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Detected Cloudflare challenge')
       );
+    });
+
+    it('should detect Cloudflare challenge via challenge marker', async () => {
+      const html = '<html><body><div class="cf-challenge-running"></div></body></html>';
+      mockPage.content.mockResolvedValue(html);
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+      await service.scrapeRegion('Capital');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Detected Cloudflare challenge')
+      );
+    });
+
+    it('should NOT trigger Cloudflare warning for large pages containing the word cloudflare', async () => {
+      // A large string that contains "cloudflare" but is legitimate content
+      const largeHtml = '<html><head><title>Farmacias de Turno</title></head><body>' + 
+                        '<h1>Listado de Farmacias</h1>' + 
+                        '<p>Contenido legítimo que menciona cloudflare por alguna razón técnica en un script...</p>' +
+                        'a'.repeat(6000) + 
+                        '</body></html>';
+      mockPage.content.mockResolvedValue(largeHtml);
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+      await service.scrapeRegion('Capital');
+
+      // Should not contain the specific bypass failed warning
+      const cloudflareWarnings = warnSpy.mock.calls.filter(call => 
+        call[0].includes('Detected Cloudflare challenge')
+      );
+      expect(cloudflareWarnings.length).toBe(0);
     });
 
     it('should handle PDF download error', async () => {

@@ -64,15 +64,20 @@ export class ColfarjuyScraperService {
       await page.waitForTimeout(5000);
 
       const html = await page.content();
-      const status = 200; // Playwright doesn't easily expose the main frame status if it redirects through CF
+      const $ = cheerio.load(html);
+      const pageTitle = $('title').text();
 
-      this.logger.log(`[Scraper] Page content captured. Size: ${html.length} bytes.`);
+      this.logger.log(`[Scraper] Page content captured. Size: ${html.length} bytes. Title: "${pageTitle}"`);
 
-      if (html.includes('Just a moment...') || html.includes('cloudflare')) {
+      const isCloudflareChallenge = 
+        pageTitle.includes('Just a moment...') || 
+        pageTitle.includes('Attention Required!') ||
+        html.includes('cf-challenge-running') ||
+        (html.includes('cloudflare') && html.length < 5000); // Challenge pages are usually small
+
+      if (isCloudflareChallenge) {
         this.logger.warn(`[Scraper] ⚠️ Detected Cloudflare challenge in captured content. Bypass might have failed.`);
       }
-
-      const $ = cheerio.load(html);
 
       // Scenario B: Look for direct PDF links or Google Drive iframes
       const pdfLinks: string[] = [];
