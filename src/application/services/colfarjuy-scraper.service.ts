@@ -6,7 +6,7 @@ import * as pdf from 'pdf-parse';
 @Injectable()
 export class ColfarjuyScraperService {
   private readonly logger = new Logger(ColfarjuyScraperService.name);
-  
+
   private readonly URL_CAPITAL = 'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026';
   private readonly URL_INTERIOR = 'https://www.colfarjuy.org.ar/novedades/1094-interior-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026';
 
@@ -39,10 +39,10 @@ export class ColfarjuyScraperService {
       this.logger.debug(`[Scraper] Using Headers: ${JSON.stringify(this.COMMON_HEADERS, null, 2)}`);
 
       const { data: html, status } = await axios.get(url, { headers: this.COMMON_HEADERS });
-      
+
       this.logger.log(`[Scraper] Received response from ${url} (Status: ${status})`);
       this.logger.log(`[Scraper] Downloaded HTML content successfully. Size: ${html.length} bytes.`);
-      
+
       const $ = cheerio.load(html);
 
       // Scenario B: Look for direct PDF links or Google Drive iframes
@@ -92,6 +92,10 @@ export class ColfarjuyScraperService {
       return rawText;
 
     } catch (error: any) {
+      if (error.response?.status === 403) {
+        error.response.data = JSON.parse(error.response.data);
+        this.logger.error(`[Scraper] Response Data: ${JSON.stringify(error.response.data, null, 2)}`);
+      }
       this.logger.error(`Error scraping article ${url}: ${error.message}`, error.stack);
       throw error;
     }
@@ -101,7 +105,7 @@ export class ColfarjuyScraperService {
   private async downloadAndParsePdf(pdfUrl: string): Promise<string> {
     try {
       this.logger.log(`[PDF Parser] Downloading PDF from: ${pdfUrl}`);
-      const response = await axios.get(pdfUrl, { 
+      const response = await axios.get(pdfUrl, {
         responseType: 'arraybuffer',
         headers: this.COMMON_HEADERS
       });
