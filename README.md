@@ -33,6 +33,71 @@ The project follows a modular structure focused on the separation of concerns:
 *   **Infrastructure Layer (`/src/infrastructure`):** Database schemas, repository implementations, external scrapers (e.g., Colfarjuy), and security services.
 *   **Domain Layer (`/src/domain`):** Core entities and abstract repository interfaces.
 
+## 📊 System Workflows
+
+### 1. Scraping & AI Normalization Pipeline
+```mermaid
+sequenceDiagram
+    participant Cron as Scheduler/Cron
+    participant API as ScrapingController
+    participant Scraper as ScraperService
+    participant AI as AiNormalizerService
+    participant Geo as GeorefService
+    participant DB as MongoDB
+
+    Cron->>API: Trigger Scrape (or Manual Request)
+    API->>Scraper: Execute Scraping Strategy
+    Scraper->>Scraper: Extract text (PDF/HTML)
+    Scraper->>AI: Send unstructured raw text chunks
+    AI->>AI: Call Google Gemini API for parsing
+    AI-->>Scraper: Return typed JSON Array
+    loop For each Pharmacy
+        Scraper->>Geo: Resolve Coordinates (address, city)
+        Geo-->>Scraper: Lat/Lng location
+    end
+    Scraper->>DB: Upsert normalized & geolocated data
+    DB-->>API: Completion Status
+```
+
+### 2. Geocoding Fallback Strategy
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant GeoService as GeorefService
+    participant GeorefAR as AR Georef API
+    participant Nominatim as Nominatim (OSM)
+
+    App->>GeoService: getCoordinates(address)
+    GeoService->>GeorefAR: Query primary official API
+    alt Found in Georef AR
+        GeorefAR-->>GeoService: Return Exact Coordinates
+    else Not Found / Error
+        GeoService->>Nominatim: Query fallback (with 1s delay)
+        alt Found in Nominatim
+            Nominatim-->>GeoService: Return Coordinates
+        else Not Found
+            GeoService-->>App: Return null / default
+        end
+    end
+    GeoService-->>App: Resolved Coordinates
+```
+
+### 3. Authentication Flow (OAuth2)
+```mermaid
+sequenceDiagram
+    participant Client as Frontend / User
+    participant Server as NestJS API
+    participant Google as Google Auth Server
+
+    Client->>Server: GET /auth/google
+    Server->>Google: Redirect to Google Login
+    Google-->>Client: Prompt for Credentials
+    Client->>Google: Authorize Application
+    Google->>Server: Callback with User Profile
+    Server->>Server: Validate User & Generate JWT
+    Server->>Client: Redirect to Frontend + ?token=JWT
+```
+
 ## 📋 Prerequisites
 
 *   Node.js (v20+)
