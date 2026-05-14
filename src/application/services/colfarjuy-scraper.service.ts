@@ -21,6 +21,9 @@ export class ColfarjuyScraperService {
     'Sec-Fetch-Mode': 'navigate',
     'Sec-Fetch-Site': 'none',
     'Sec-Fetch-User': '?1',
+    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
     'Referer': 'https://www.colfarjuy.org.ar/',
@@ -93,8 +96,12 @@ export class ColfarjuyScraperService {
 
     } catch (error: any) {
       if (error.response?.status === 403) {
-        error.response.data = JSON.parse(error.response.data);
-        this.logger.error(`[Scraper] Response Data: ${JSON.stringify(error.response.data, null, 2)}`);
+        const responseData = error.response.data;
+        if (typeof responseData === 'string') {
+          this.logger.error(`[Scraper] 403 Forbidden - Response body starts with: ${responseData.substring(0, 500)}`);
+        } else {
+          this.logger.error(`[Scraper] 403 Forbidden - Response body: ${JSON.stringify(responseData, null, 2)}`);
+        }
       }
       this.logger.error(`Error scraping article ${url}: ${error.message}`, error.stack);
       throw error;
