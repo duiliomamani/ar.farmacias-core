@@ -35,9 +35,6 @@ export class PharmacyReportController {
       new SubmitPharmacyReportCommand(pharmacyId, lat, lng, deviceId, isOnDuty, imageUrl, userId)
     );
 
-    return {
-      status: 'success',
-      message: 'Report submitted for verification',
-    };
+    return true;
   }
 }

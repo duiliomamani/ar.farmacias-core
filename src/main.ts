@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { TransformInterceptor } from './infrastructure/interceptors/transform.interceptor';
+import { AllExceptionsFilter } from './infrastructure/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,6 +11,10 @@ async function bootstrap() {
   // Enable CORS
   app.enableCors();
   
+  // Standardized response format
+  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalFilters(new AllExceptionsFilter());
+
   // Enable global validation pipe with strict settings
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
