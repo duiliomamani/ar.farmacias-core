@@ -97,6 +97,7 @@ export class ColfarjuyScraperService {
     } catch (error: any) {
       if (error.response?.status === 403) {
         const responseData = error.response.data;
+        this.logger.error("Error scraping article : ", error.response.text)
         if (typeof responseData === 'string') {
           this.logger.error(`[Scraper] 403 Forbidden - Response body starts with: ${responseData.substring(0, 500)}`);
         } else {
