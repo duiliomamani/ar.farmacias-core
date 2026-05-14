@@ -3,6 +3,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { ScrapeColfarjuyCommand } from '../../application/commands/scrape-colfarjuy.command';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import { ApiRes } from 'src/application/dtos/api-response.dto';
 
 @ApiTags('scraping')
 @Controller('api/scraping')
@@ -16,12 +17,12 @@ export class ScrapingController {
 
   @Get('colfarjuy')
   @ApiOperation({ summary: 'Trigger the Colfarjuy scraping process (Vercel Cron)' })
-  @ApiHeader({ name: 'x-auth-token', description: 'Bearer <CRON_SECRET>' })
+  @ApiHeader({ name: 'authorization', description: 'Bearer <CRON_SECRET>' })
   @ApiResponse({ status: 200, description: 'Scraping process completed' })
   @ApiResponse({ status: 401, description: 'Invalid cron secret' })
   async triggerColfarjuyScraping(@Headers() headers: any) {
     this.logger.log(`Headers received: ${JSON.stringify(headers)}`);
-    const authHeader = headers['x-auth-token'] || headers['X-Auth-Token'];
+    const authHeader = headers['authorization'];
     this.logger.log(`Resolved authHeader: ${authHeader ? 'Present' : 'Missing'}`);
     this.validateCronAuth(authHeader);
 
@@ -29,10 +30,10 @@ export class ScrapingController {
 
     try {
       await this.commandBus.execute(new ScrapeColfarjuyCommand());
-      return { status: 'success', message: 'Scraping process initiated and completed' };
+      return ApiRes.success({ status: 'success', message: 'Scraping process initiated and completed' });
     } catch (error: any) {
       this.logger.error(`Scraping failed: ${error.message}`);
-      return { status: 'error', message: error.message };
+      return ApiRes.singleError('SCRAPING_FAILED', error.message);
     }
   }
 
