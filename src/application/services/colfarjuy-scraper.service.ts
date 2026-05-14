@@ -3,23 +3,6 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as pdf from 'pdf-parse';
 import { chromium } from 'playwright-core';
-import { addExtra } from 'playwright-extra';
-
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-
-const chromiumStealth = addExtra(chromium);
-const stealth = StealthPlugin();
-
-// Disable evasions that often cause issues with bundlers/serverless environments
-// these are often not strictly necessary for Cloudflare bypass
-try {
-  stealth.enabledEvasions.delete('chrome.app');
-  stealth.enabledEvasions.delete('chrome.runtime');
-} catch (e) {
-  // Ignore if they don't exist in this version
-}
-
-chromiumStealth.use(stealth);
 
 @Injectable()
 export class ColfarjuyScraperService {
@@ -46,10 +29,26 @@ export class ColfarjuyScraperService {
     try {
       this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
       
-      browser = await chromiumStealth.launch({ headless: true });
+      browser = await chromium.launch({ 
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--no-sandbox',
+          '--disable-setuid-sandbox'
+        ]
+      });
+
       const context = await browser.newContext({
         userAgent: this.COMMON_HEADERS['User-Agent'],
-        viewport: { width: 1280, height: 720 }
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+      });
+
+      // Manual Evasion: Remove navigator.webdriver
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+        });
       });
       
       const page = await context.newPage();

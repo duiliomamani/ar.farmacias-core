@@ -3,7 +3,6 @@ import { ColfarjuyScraperService } from './colfarjuy-scraper.service';
 import axios from 'axios';
 import * as pdf from 'pdf-parse';
 import { chromium } from 'playwright-core';
-import { addExtra } from 'playwright-extra';
 
 jest.mock('axios');
 jest.mock('pdf-parse');
@@ -12,17 +11,9 @@ jest.mock('playwright-core', () => ({
     launch: jest.fn(),
   },
 }));
-jest.mock('playwright-extra', () => ({
-  addExtra: jest.fn().mockReturnValue({
-    use: jest.fn(),
-    launch: jest.fn(),
-  }),
-}));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedChromium = chromium as jest.Mocked<any>;
-const mockedAddExtra = addExtra as jest.MockedFunction<typeof addExtra>;
-const mockedChromiumStealth = mockedAddExtra(chromium) as any;
 
 describe('ColfarjuyScraperService', () => {
   let service: ColfarjuyScraperService;
@@ -35,6 +26,7 @@ describe('ColfarjuyScraperService', () => {
 
   const mockContext = {
     newPage: jest.fn().mockResolvedValue(mockPage),
+    addInitScript: jest.fn(),
   };
 
   const mockBrowser = {
@@ -50,7 +42,7 @@ describe('ColfarjuyScraperService', () => {
     }).compile();
 
     service = module.get<ColfarjuyScraperService>(ColfarjuyScraperService);
-    mockedChromiumStealth.launch.mockResolvedValue(mockBrowser);
+    mockedChromium.launch.mockResolvedValue(mockBrowser);
   });
 
   afterEach(() => {
@@ -68,7 +60,7 @@ describe('ColfarjuyScraperService', () => {
 
       const result = await service.scrapeRegion('Capital');
 
-      expect(mockedChromiumStealth.launch).toHaveBeenCalled();
+      expect(mockedChromium.launch).toHaveBeenCalled();
       expect(mockPage.goto).toHaveBeenCalledWith(
         'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026',
         expect.anything()
@@ -109,7 +101,7 @@ describe('ColfarjuyScraperService', () => {
     });
 
     it('should handle errors and close browser', async () => {
-      mockedChromiumStealth.launch.mockRejectedValue(new Error('Browser failed'));
+      mockedChromium.launch.mockRejectedValue(new Error('Browser failed'));
       await expect(service.scrapeRegion('Capital')).rejects.toThrow('Browser failed');
       // Browser didn't launch, so close shouldn't be called on it
     });
