@@ -1,4 +1,4 @@
-import { Controller, Post, Headers, UnauthorizedException, Logger } from '@nestjs/common';
+import { Controller, Post, Headers, UnauthorizedException, Logger, Get } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ScrapeColfarjuyCommand } from '../../application/commands/scrape-colfarjuy.command';
 import { ConfigService } from '@nestjs/config';
@@ -14,7 +14,7 @@ export class ScrapingController {
     private readonly configService: ConfigService,
   ) { }
 
-  @Post('colfarjuy')
+  @Get('colfarjuy')
   @ApiOperation({ summary: 'Trigger the Colfarjuy scraping process (Vercel Cron)' })
   @ApiHeader({ name: 'x-auth-token', description: 'Bearer <CRON_SECRET>' })
   @ApiResponse({ status: 200, description: 'Scraping process completed' })
