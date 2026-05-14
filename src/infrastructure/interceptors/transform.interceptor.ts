@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { ApiResponse, ApiResponseDto } from '../../application/dtos/api-response.dto';
+import { ApiRes, ApiResponseDto } from '../../application/dtos/api-response.dto';
 
 @Injectable()
 export class TransformInterceptor<T>
@@ -22,7 +22,7 @@ export class TransformInterceptor<T>
         if (data && typeof data === 'object' && 'isSuccessful' in data && 'errors' in data) {
           return data;
         }
-        return ApiResponse.success(data);
+        return ApiRes.success(data);
       }),
     );
   }

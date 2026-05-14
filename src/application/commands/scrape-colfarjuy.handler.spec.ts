@@ -43,6 +43,7 @@ describe('ScrapeColfarjuyHandler', () => {
 
   const mockPharmacyModel = {
     findOneAndUpdate: jest.fn().mockResolvedValue({}),
+    bulkWrite: jest.fn().mockResolvedValue({}),
   };
 
   beforeEach(async () => {
@@ -75,9 +76,9 @@ describe('ScrapeColfarjuyHandler', () => {
     await handler.execute(new ScrapeColfarjuyCommand());
 
     expect(scraperService.scrapeRegion).toHaveBeenCalledTimes(2); // Capital and Interior
-    expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledTimes(8); // 2 regions * 4 weeks
-    expect(geoRefService.geocodeAddress).toHaveBeenCalledTimes(8); // 8 normalizer results total
-    expect(pharmacyModel.findOneAndUpdate).toHaveBeenCalledTimes(8);
+    expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledTimes(4); // 2 regions * 2 weeks
+    expect(geoRefService.geocodeAddress).toHaveBeenCalledTimes(4); // 4 normalizer results total
+    expect(pharmacyModel.bulkWrite).toHaveBeenCalledTimes(4);
   });
 
   it('should map city names correctly', () => {
@@ -102,14 +103,18 @@ describe('ScrapeColfarjuyHandler', () => {
 
     await (handler as any).processRegion('Interior');
     
-    expect(pharmacyModel.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        $set: expect.objectContaining({
-          isVoluntary: true
+    expect(pharmacyModel.bulkWrite).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          updateOne: expect.objectContaining({
+            update: expect.objectContaining({
+              $set: expect.objectContaining({
+                isVoluntary: true
+              })
+            })
+          })
         })
-      }),
-      expect.anything()
+      ])
     );
   });
 
@@ -128,14 +133,18 @@ describe('ScrapeColfarjuyHandler', () => {
 
     await (handler as any).processRegion('Capital');
     
-    expect(pharmacyModel.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        $set: expect.objectContaining({
-          isPermanentlyOnDuty: true
+    expect(pharmacyModel.bulkWrite).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          updateOne: expect.objectContaining({
+            update: expect.objectContaining({
+              $set: expect.objectContaining({
+                isPermanentlyOnDuty: true
+              })
+            })
+          })
         })
-      }),
-      expect.anything()
+      ])
     );
   });
 });

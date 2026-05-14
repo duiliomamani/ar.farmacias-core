@@ -48,7 +48,7 @@ describe('PharmacyReportController', () => {
       const result = await controller.submitReport(body, req);
 
       expect(commandBus.execute).toHaveBeenCalledWith(expect.any(SubmitPharmacyReportCommand));
-      expect(result).toEqual({ status: 'success', message: 'Report submitted for verification' });
+      expect(result).toBe(true);
     });
   });
 });

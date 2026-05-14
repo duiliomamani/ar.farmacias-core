@@ -11,6 +11,7 @@ import { SubmitReportDto } from '../../application/dtos/submit-report.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard';
+import { ApiRes, ApiResponseDto } from '../../application/dtos/api-response.dto';
 
 @ApiTags('reports')
 @Controller('api/pharmacies/report')
@@ -25,9 +26,9 @@ export class PharmacyReportController {
   @Throttle({ default: { limit: 3, ttl: 1800000 } })
   @ApiOperation({ summary: 'Submit a community report for a pharmacy status' })
   @ApiResponse({ status: 201, description: 'Report successfully submitted' })
-  async submitReport(@Body() dto: SubmitReportDto, @Req() req: any) {
+  async submitReport(@Body() dto: SubmitReportDto, @Req() req: any): Promise<ApiResponseDto<boolean>> {
     const { pharmacyId, lat, lng, deviceId, isOnDuty, imageUrl } = dto;
-    
+
     // We can now associate the report with the logged user if needed
     const userId = req.user.userId;
 
@@ -35,6 +36,7 @@ export class PharmacyReportController {
       new SubmitPharmacyReportCommand(pharmacyId, lat, lng, deviceId, isOnDuty, imageUrl, userId)
     );
 
-    return true;
+    return ApiRes.success(true);
   }
 }
+

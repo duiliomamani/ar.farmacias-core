@@ -56,7 +56,7 @@ export class ApiResponseDto<T> {
 /**
  * Helper class to build standardized API responses
  */
-export class ApiResponse {
+export class ApiRes {
   /**
    * Create a successful response without pagination
    */

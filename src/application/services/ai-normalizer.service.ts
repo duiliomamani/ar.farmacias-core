@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { COLFARJUY_CAPITAL_PROMPT, COLFARJUY_INTERIOR_PROMPT } from './prompts';
+import { COLFARJUY_SYSTEM_PROMPT, COLFARJUY_INTERIOR_PROMPT } from './prompts';
 
 export interface NormalizedPharmacy {
   name: string;
@@ -41,7 +41,7 @@ export class AiNormalizerService {
       ? `EXTRACT ONLY for the date range: from ${dateRange.start} to ${dateRange.end} inclusive.`
       : `EXTRACT ALL pharmacies mentioned in the text for the current and future dates.`;
 
-    const basePrompt = region === 'Capital' ? COLFARJUY_CAPITAL_PROMPT : COLFARJUY_INTERIOR_PROMPT;
+    const basePrompt = region === 'Capital' ? COLFARJUY_SYSTEM_PROMPT : COLFARJUY_INTERIOR_PROMPT;
 
     const fullPrompt = `${basePrompt}
 
