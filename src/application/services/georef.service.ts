@@ -20,8 +20,9 @@ export class GeoRefService {
   constructor(private configService: ConfigService) { }
 
   async reverseGeocode(lat: number, lng: number): Promise<GeoRefResponse | null> {
-    this.logger.log(`Reverse Geocoding: ${lat}, ${lng}`);
+    this.logger.log(`[GeoRef API] Reverse Geocoding coordinates: [${lat}, ${lng}]`);
     try {
+      this.logger.debug(`[GeoRef API] Requesting ${this.georefUrl}/api/ubicacion...`);
       const response = await axios.get(`${this.georefUrl}/api/ubicacion`, {
         params: {
           lat,
@@ -49,7 +50,7 @@ export class GeoRefService {
   }
 
   async geocodeAddress(address: string, city: string = 'San Salvador de Jujuy'): Promise<GeoRefResponse | null> {
-    this.logger.log(`Geocoding: ${address}, ${city}`);
+    this.logger.log(`[Geocoding Pipeline] Started for address: "${address}", city: "${city}"`);
 
     // Strategy 1: Google Maps (High Precision - Needs API Key)
     const googleResult = await this.tryGoogleMaps(address, city);
@@ -59,7 +60,7 @@ export class GeoRefService {
     const nominatimResult = await this.tryNominatim(address, city);
     if (nominatimResult) return nominatimResult;
 
-    this.logger.warn(`Failed to geocode: ${address}, ${city}`);
+    this.logger.warn(`[Geocoding Pipeline] ❌ ALL strategies failed for: "${address}", city: "${city}"`);
     return null;
   }
 
@@ -68,6 +69,7 @@ export class GeoRefService {
     if (!apiKey) return null;
 
     try {
+      this.logger.debug(`[Google Maps API] Requesting geocoding for: ${address}, ${city}...`);
       const response = await axios.get(`${this.googleMapsUrl}/api/geocode/json`, {
         params: {
           address: `${address}, ${city}, Jujuy, Argentina`,
@@ -101,6 +103,7 @@ export class GeoRefService {
 
   private async tryNominatim(address: string, city: string): Promise<GeoRefResponse | null> {
     try {
+      this.logger.debug(`[Nominatim API] Requesting geocoding for: ${address}, ${city}...`);
       // Nominatim requires a User-Agent and recommends a delay between requests
       const response = await axios.get(this.nominatimUrl, {
         params: {

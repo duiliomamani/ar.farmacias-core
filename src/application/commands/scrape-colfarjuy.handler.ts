@@ -20,7 +20,7 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
   ) { }
 
   async execute(_command: ScrapeColfarjuyCommand): Promise<void> {
-    this.logger.log('Executing Colfarjuy Scraping Command...');
+    this.logger.log('[Handler] === Executing Colfarjuy Scraping Command ===');
 
     try {
       await this.processRegion('Capital');
@@ -32,8 +32,12 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
   }
 
   private async processRegion(region: 'Capital' | 'Interior'): Promise<void> {
+    this.logger.log(`[Handler] >>> Starting processing for region: ${region} <<<`);
     const rawText = await this.colfarjuyScraper.scrapeRegion(region);
-    if (!rawText) return;
+    if (!rawText) {
+      this.logger.warn(`[Handler] No raw text returned for ${region}. Skipping.`);
+      return;
+    }
 
     const weeksToScrape = 2; // Reduced to 2 weeks for faster updates
     for (let i = 0; i < weeksToScrape; i++) {
@@ -48,12 +52,14 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
       };
 
       this.logger.log(`Processing chunk ${i + 1}/${weeksToScrape}: ${dateRange.start} to ${dateRange.end} for ${region}`);
+      this.logger.log(`Sending ${rawText.length} characters of raw text to AI Normalizer...`);
       const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(rawText, region, dateRange);
       
       if (structuredData && structuredData.length > 0) {
+        this.logger.log(`AI Normalizer returned ${structuredData.length} pharmacy records for ${region}.`);
         await this.saveNormalizedPharmaciesBatch(structuredData);
       } else {
-        this.logger.debug(`No data found for range ${dateRange.start} - ${dateRange.end}`);
+        this.logger.warn(`No data found/extracted by AI for range ${dateRange.start} - ${dateRange.end} in ${region}`);
       }
     }
   }
@@ -84,7 +90,14 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
         }
 
         // Geocoding is the bottleneck. We parallelize it within the chunk.
+        this.logger.log(`Geocoding address for ${data.name} in ${mappedCity}: ${data.address}`);
         const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity);
+        
+        if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+          this.logger.log(`✅ Geocoded ${data.name} successfully at [${geo.lat}, ${geo.lng}]`);
+        } else {
+          this.logger.warn(`❌ Geocoding failed or returned invalid coordinates for ${data.name} (${data.address})`);
+        }
         
         const updateData: any = {
           ...data,
@@ -142,8 +155,11 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
     }
 
     if (bulkOps.length > 0) {
-      await this.pharmacyModel.bulkWrite(bulkOps);
-      this.logger.log(`Successfully persisted batch of ${bulkOps.length} pharmacies via bulkWrite.`);
+      this.logger.log(`[Handler] Executing MongoDB bulkWrite with ${bulkOps.length} operations...`);
+      const result = await this.pharmacyModel.bulkWrite(bulkOps);
+      this.logger.log(`[Handler] ✅ Successfully persisted batch. Modified/Upserted: ${result.upsertedCount + result.modifiedCount} pharmacies.`);
+    } else {
+      this.logger.log(`[Handler] No operations to perform in this batch.`);
     }
   }
 

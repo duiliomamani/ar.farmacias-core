@@ -24,8 +24,11 @@ export class ScrapingController {
     const authHeader = headers['authorization'];
     this.validateCronAuth(authHeader);
 
+    this.logger.log('--- STARTING COLFARJUY SCRAPING PROCESS ---');
     try {
+      this.logger.log('Dispatching ScrapeColfarjuyCommand to the command bus...');
       await this.commandBus.execute(new ScrapeColfarjuyCommand());
+      this.logger.log('--- COLFARJUY SCRAPING PROCESS COMPLETED SUCCESSFULLY ---');
       return ApiRes.success({ status: 'success', message: 'Scraping process initiated and completed' });
     } catch (error: any) {
       this.logger.error(`Scraping failed: ${error.message}`);

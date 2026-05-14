@@ -18,8 +18,9 @@ export class ColfarjuyScraperService {
   async scrapeRegion(region: 'Capital' | 'Interior'): Promise<string> {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
     try {
-      this.logger.log(`Starting scrape for ${region} at ${url}`);
+      this.logger.log(`[Scraper] Starting scrape for region [${region}] at URL: ${url}`);
       const { data: html } = await axios.get(url);
+      this.logger.log(`[Scraper] Downloaded HTML content successfully. Size: ${html.length} bytes.`);
       const $ = cheerio.load(html);
 
       // Scenario B: Look for direct PDF links or Google Drive iframes
@@ -48,23 +49,24 @@ export class ColfarjuyScraperService {
       let rawText = '';
 
       if (pdfLinks.length > 0) {
-        this.logger.log(`Found ${pdfLinks.length} PDF sources. Parsing...`);
+        this.logger.log(`[Scraper] Found ${pdfLinks.length} PDF sources. Preparing to parse them...`);
         for (const pdfUrl of pdfLinks) {
           const pdfContent = await this.downloadAndParsePdf(pdfUrl);
           rawText += pdfContent + '\n';
         }
       } else {
         // Scenario A: Extract text from standard containers
-        this.logger.log('No PDFs found. Extracting text from HTML content.');
+        this.logger.log('[Scraper] No PDFs found. Attempting to extract text from raw HTML content...');
         const contentContainer = $('.item-page, .article-content, #main-content');
         rawText = contentContainer.find('p, table, div').text();
       }
 
       if (!rawText.trim()) {
-        this.logger.warn(`No text content found at ${url}`);
+        this.logger.warn(`[Scraper] ❌ Warning: No text content found at ${url}`);
         return '';
       }
 
+      this.logger.log(`[Scraper] ✅ Successfully extracted ${rawText.length} characters of raw text for ${region}.`);
       return rawText;
 
     } catch (error: any) {
@@ -76,11 +78,13 @@ export class ColfarjuyScraperService {
 
   private async downloadAndParsePdf(pdfUrl: string): Promise<string> {
     try {
-      this.logger.log(`Downloading PDF: ${pdfUrl}`);
+      this.logger.log(`[PDF Parser] Downloading PDF from: ${pdfUrl}`);
       const response = await axios.get(pdfUrl, { responseType: 'arraybuffer' });
+      this.logger.log(`[PDF Parser] PDF downloaded. Size: ${response.data.byteLength} bytes. Parsing...`);
       // Use the default export from pdf-parse or cast it as any to call it
       const pdfParser = (pdf as any).default || pdf;
       const data = await pdfParser(Buffer.from(response.data));
+      this.logger.log(`[PDF Parser] ✅ PDF parsed successfully. Extracted ${data.text.length} characters.`);
       return data.text;
     } catch (error: any) {
       this.logger.error(`Failed to parse PDF ${pdfUrl}: ${error.message}`);
