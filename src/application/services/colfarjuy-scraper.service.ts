@@ -4,10 +4,22 @@ import * as cheerio from 'cheerio';
 import * as pdf from 'pdf-parse';
 import { chromium } from 'playwright-core';
 import { addExtra } from 'playwright-extra';
+
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 const chromiumStealth = addExtra(chromium);
-chromiumStealth.use(StealthPlugin());
+const stealth = StealthPlugin();
+
+// Disable evasions that often cause issues with bundlers/serverless environments
+// these are often not strictly necessary for Cloudflare bypass
+try {
+  stealth.enabledEvasions.delete('chrome.app');
+  stealth.enabledEvasions.delete('chrome.runtime');
+} catch (e) {
+  // Ignore if they don't exist in this version
+}
+
+chromiumStealth.use(stealth);
 
 @Injectable()
 export class ColfarjuyScraperService {
