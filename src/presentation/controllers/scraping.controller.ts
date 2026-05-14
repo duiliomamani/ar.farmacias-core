@@ -17,11 +17,11 @@ export class ScrapingController {
 
   @Get('colfarjuy')
   @ApiOperation({ summary: 'Trigger the Colfarjuy scraping process (Vercel Cron)' })
-  @ApiHeader({ name: 'authorization', description: 'Bearer <CRON_SECRET>' })
+  @ApiHeader({ name: 'x-auth-token', description: '<CRON_SECRET>' })
   @ApiResponse({ status: 200, description: 'Scraping process completed' })
   @ApiResponse({ status: 401, description: 'Invalid cron secret' })
   async triggerColfarjuyScraping(@Headers() headers: any) {
-    const authHeader = headers['authorization'];
+    const authHeader = headers['x-auth-token'];
     this.validateCronAuth(authHeader);
 
     this.logger.log('--- STARTING COLFARJUY SCRAPING PROCESS ---');
