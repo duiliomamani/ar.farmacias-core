@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as pdf from 'pdf-parse';
+import { chromium } from 'playwright-extra';
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+chromium.use(StealthPlugin());
 
 @Injectable()
 export class ColfarjuyScraperService {
@@ -20,19 +24,38 @@ export class ColfarjuyScraperService {
   constructor() { }
 
   /**
-   * Scrapes a specific region's schedule
+   * Scrapes a specific region's schedule using Playwright to bypass Cloudflare
    */
   async scrapeRegion(region: 'Capital' | 'Interior'): Promise<string> {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
+    let browser;
     try {
-      this.logger.log(`[Scraper] Starting scrape for region [${region}]`);
-      this.logger.debug(`[Scraper] Requesting URL: ${url}`);
-      this.logger.debug(`[Scraper] Using Headers: ${JSON.stringify(this.COMMON_HEADERS, null, 2)}`);
+      this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
+      
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({
+        userAgent: this.COMMON_HEADERS['User-Agent'],
+        viewport: { width: 1280, height: 720 }
+      });
+      
+      const page = await context.newPage();
+      
+      this.logger.log(`[Scraper] Navigating to: ${url}`);
+      
+      // Navigate and wait for network to be idle (Cloudflare challenge usually finishes by then)
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+      
+      // Extra wait just in case Cloudflare is still thinking
+      await page.waitForTimeout(5000);
 
-      const { data: html, status } = await axios.get(url, { headers: this.COMMON_HEADERS });
+      const html = await page.content();
+      const status = 200; // Playwright doesn't easily expose the main frame status if it redirects through CF
 
-      this.logger.log(`[Scraper] Received response from ${url} (Status: ${status})`);
-      this.logger.log(`[Scraper] Downloaded HTML content successfully. Size: ${html.length} bytes.`);
+      this.logger.log(`[Scraper] Page content captured. Size: ${html.length} bytes.`);
+
+      if (html.includes('Just a moment...') || html.includes('cloudflare')) {
+        this.logger.warn(`[Scraper] ⚠️ Detected Cloudflare challenge in captured content. Bypass might have failed.`);
+      }
 
       const $ = cheerio.load(html);
 
@@ -94,6 +117,11 @@ export class ColfarjuyScraperService {
       }
       this.logger.error(`Error scraping article ${url}: ${error.message}`, error.stack);
       throw error;
+    } finally {
+      if (browser) {
+        await browser.close();
+        this.logger.log(`[Scraper] Browser closed.`);
+      }
     }
   }
 
