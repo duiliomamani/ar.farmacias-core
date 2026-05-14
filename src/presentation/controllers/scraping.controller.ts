@@ -21,12 +21,8 @@ export class ScrapingController {
   @ApiResponse({ status: 200, description: 'Scraping process completed' })
   @ApiResponse({ status: 401, description: 'Invalid cron secret' })
   async triggerColfarjuyScraping(@Headers() headers: any) {
-    this.logger.log(`Headers received: ${JSON.stringify(headers)}`);
     const authHeader = headers['authorization'];
-    this.logger.log(`Resolved authHeader: ${authHeader ? 'Present' : 'Missing'}`);
     this.validateCronAuth(authHeader);
-
-    this.logger.log('Scraping triggered via API (Vercel Cron)');
 
     try {
       await this.commandBus.execute(new ScrapeColfarjuyCommand());
