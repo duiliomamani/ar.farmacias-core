@@ -1,11 +1,14 @@
-# compiled output
+# Nestjs specific
 /dist
 /node_modules
+/build
+/tmp
 
 # Logs
 logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
@@ -36,15 +39,11 @@ lerna-debug.log*
 # misc
 /.sass-cache
 /connect.lock
-/coverage
 /libpeerconnection.log
-npm-debug.log
-yarn-error.log
 testem.log
 /typings
 
 # System Files
-.DS_Store
 Thumbs.db
 
 # env
@@ -52,6 +51,11 @@ Thumbs.db
 .env.test
 .env.production
 .env.local
+.env.development
 
 # tsconfig
 tsconfig.tsbuildinfo
+
+# temp directory
+.temp
+.tmp
