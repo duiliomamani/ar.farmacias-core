@@ -10,6 +10,14 @@ export class ColfarjuyScraperService {
   private readonly URL_CAPITAL = 'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026';
   private readonly URL_INTERIOR = 'https://www.colfarjuy.org.ar/novedades/1094-interior-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026';
 
+  private readonly COMMON_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+  };
+
   constructor() { }
 
   /**
@@ -19,7 +27,7 @@ export class ColfarjuyScraperService {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
     try {
       this.logger.log(`[Scraper] Starting scrape for region [${region}] at URL: ${url}`);
-      const { data: html } = await axios.get(url);
+      const { data: html } = await axios.get(url, { headers: this.COMMON_HEADERS });
       this.logger.log(`[Scraper] Downloaded HTML content successfully. Size: ${html.length} bytes.`);
       const $ = cheerio.load(html);
 
@@ -79,7 +87,10 @@ export class ColfarjuyScraperService {
   private async downloadAndParsePdf(pdfUrl: string): Promise<string> {
     try {
       this.logger.log(`[PDF Parser] Downloading PDF from: ${pdfUrl}`);
-      const response = await axios.get(pdfUrl, { responseType: 'arraybuffer' });
+      const response = await axios.get(pdfUrl, { 
+        responseType: 'arraybuffer',
+        headers: this.COMMON_HEADERS
+      });
       this.logger.log(`[PDF Parser] PDF downloaded. Size: ${response.data.byteLength} bytes. Parsing...`);
       // Use the default export from pdf-parse or cast it as any to call it
       const pdfParser = (pdf as any).default || pdf;
