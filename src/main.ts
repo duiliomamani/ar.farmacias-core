@@ -1,12 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { TransformInterceptor } from './infrastructure/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './infrastructure/filters/http-exception.filter';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import express from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+const server = express();
+
+async function createNestApp(expressInstance: express.Express): Promise<INestApplication> {
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressInstance),
+  );
 
   // Enable CORS
   app.enableCors();
@@ -34,6 +41,31 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.init();
+  return app;
 }
-bootstrap();
+
+// Singleton for Vercel
+let cachedApp: INestApplication;
+
+async function bootstrap() {
+  if (!cachedApp) {
+    cachedApp = await createNestApp(server);
+  }
+  return cachedApp;
+}
+
+// Local development
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  bootstrap().then(async (app) => {
+    const port = process.env.PORT ?? 3000;
+    await app.listen(port);
+    console.log(`Application is running on: http://localhost:${port}`);
+  });
+}
+
+// Export for Vercel
+export default async (req: any, res: any) => {
+  await bootstrap();
+  server(req, res);
+};

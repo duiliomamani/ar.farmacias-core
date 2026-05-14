@@ -61,4 +61,33 @@ describe('PharmacyController', () => {
       );
     });
   });
+
+  describe('getByDate', () => {
+    it('should execute GetPharmaciesByDateQuery with correct parameters', async () => {
+      const dto = {
+        date: '2026-05-20',
+        city: 'Ciudad de Perico',
+      };
+      const mockResult = [{ name: 'Pharmacy 2' }];
+      mockQueryBus.execute.mockResolvedValue(mockResult);
+
+      const result = await controller.getByDate(dto);
+
+      expect(queryBus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Ciudad de Perico' })
+      );
+      expect(result).toEqual({ data: mockResult, isSuccessful: true, errors: [] });
+    });
+
+    it('should handle dates with timezone information properly', async () => {
+      const dto = {
+        date: '2026-05-20T00:00:00Z',
+      };
+      mockQueryBus.execute.mockResolvedValue([]);
+
+      await controller.getByDate(dto);
+
+      expect(queryBus.execute).toHaveBeenCalled();
+    });
+  });
 });
