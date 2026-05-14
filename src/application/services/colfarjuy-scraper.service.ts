@@ -34,9 +34,15 @@ export class ColfarjuyScraperService {
   async scrapeRegion(region: 'Capital' | 'Interior'): Promise<string> {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
     try {
-      this.logger.log(`[Scraper] Starting scrape for region [${region}] at URL: ${url}`);
-      const { data: html } = await axios.get(url, { headers: this.COMMON_HEADERS });
+      this.logger.log(`[Scraper] Starting scrape for region [${region}]`);
+      this.logger.debug(`[Scraper] Requesting URL: ${url}`);
+      this.logger.debug(`[Scraper] Using Headers: ${JSON.stringify(this.COMMON_HEADERS, null, 2)}`);
+
+      const { data: html, status } = await axios.get(url, { headers: this.COMMON_HEADERS });
+      
+      this.logger.log(`[Scraper] Received response from ${url} (Status: ${status})`);
       this.logger.log(`[Scraper] Downloaded HTML content successfully. Size: ${html.length} bytes.`);
+      
       const $ = cheerio.load(html);
 
       // Scenario B: Look for direct PDF links or Google Drive iframes
