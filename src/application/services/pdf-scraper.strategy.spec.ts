@@ -32,7 +32,10 @@ describe('PdfScraperStrategy', () => {
 
       const result = await strategy.scrape(source);
 
-      expect(axios.get).toHaveBeenCalledWith(source, { responseType: 'arraybuffer' });
+      expect(axios.get).toHaveBeenCalledWith(source, expect.objectContaining({ 
+        responseType: 'arraybuffer',
+        headers: expect.any(Object)
+      }));
       expect(result).toBe('parsed text');
     });
   });

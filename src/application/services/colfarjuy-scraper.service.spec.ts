@@ -35,7 +35,10 @@ describe('ColfarjuyScraperService', () => {
 
       const result = await service.scrapeRegion('Capital');
 
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026');
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026',
+        expect.objectContaining({ headers: expect.any(Object) })
+      );
       expect(result).toContain('Farmacia de Turno: Belgrano');
     });
 
