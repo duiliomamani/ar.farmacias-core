@@ -21,8 +21,6 @@ describe('PharmacyRepository', () => {
     isOnDuty: true,
     dutyFrom: new Date(),
     dutyUntil: new Date(new Date().getTime() + 100000), // In the future
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   const mockPharmacyModel = {
@@ -34,9 +32,7 @@ describe('PharmacyRepository', () => {
 
   const mockReportModel = {
     find: jest.fn().mockReturnValue({
-      sort: jest.fn().mockReturnValue({
-        limit: jest.fn().mockResolvedValue([]),
-      }),
+      sort: jest.fn().mockResolvedValue([]),
     }),
   };
 
@@ -75,7 +71,6 @@ describe('PharmacyRepository', () => {
         city: 'Jujuy',
         dutyFrom: new Date('2026-06-01T08:00:00Z'),
         dutyUntil: new Date('2026-06-02T08:00:00Z'),
-        georef: { provinciaId: '1', municipioId: '2', localidadId: '3' } as any,
       } as any);
 
       mockPharmacyModel.findOneAndUpdate.mockResolvedValue(mockPharmacyDoc);

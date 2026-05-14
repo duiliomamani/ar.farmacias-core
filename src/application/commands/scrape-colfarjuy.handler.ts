@@ -35,7 +35,7 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
     const rawText = await this.colfarjuyScraper.scrapeRegion(region);
     if (!rawText) return;
 
-    const weeksToScrape = 4;
+    const weeksToScrape = 2; // Reduced to 2 weeks for faster updates
     for (let i = 0; i < weeksToScrape; i++) {
       const start = new Date();
       start.setUTCDate(start.getUTCDate() + (i * 7));
@@ -51,82 +51,105 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
       const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(rawText, region, dateRange);
       
       if (structuredData && structuredData.length > 0) {
-        await this.saveNormalizedPharmacies(structuredData);
+        await this.saveNormalizedPharmaciesBatch(structuredData);
       } else {
         this.logger.debug(`No data found for range ${dateRange.start} - ${dateRange.end}`);
       }
     }
   }
 
-  private async saveNormalizedPharmacies(pharmacies: any[]): Promise<void> {
-    for (const data of pharmacies) {
-      const mappedCity = this.mapCityName(data.city);
+  private async saveNormalizedPharmaciesBatch(pharmacies: any[]): Promise<void> {
+    const BATCH_SIZE = 5; // Process geocoding in small concurrent batches
+    const bulkOps: any[] = [];
+
+    this.logger.log(`Preparing batch of ${pharmacies.length} pharmacies...`);
+
+    for (let i = 0; i < pharmacies.length; i += BATCH_SIZE) {
+      const chunk = pharmacies.slice(i, i + BATCH_SIZE);
       
-      if (!data.dutyUntil || !data.dutyFrom) {
-        this.logger.warn(`Skipping pharmacy ${data.name} because duty dates are missing.`);
-        continue;
-      }
+      const chunkPromises = chunk.map(async (data) => {
+        const mappedCity = this.mapCityName(data.city);
+        
+        if (!data.dutyUntil || !data.dutyFrom) {
+          this.logger.warn(`Skipping pharmacy ${data.name} because duty dates are missing.`);
+          return null;
+        }
 
-      this.logger.debug(`Processing pharmacy: ${data.name} in ${mappedCity}`);
+        const dutyFromDate = new Date(data.dutyFrom);
+        const dutyUntilDate = new Date(data.dutyUntil);
 
-      const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity);
-      
-      const dutyFromDate = new Date(data.dutyFrom);
-      const dutyUntilDate = new Date(data.dutyUntil);
+        if (isNaN(dutyFromDate.getTime()) || isNaN(dutyUntilDate.getTime())) {
+          this.logger.error(`Invalid date received for pharmacy ${data.name}: ${data.dutyFrom} - ${data.dutyUntil}`);
+          return null;
+        }
 
-      if (isNaN(dutyFromDate.getTime()) || isNaN(dutyUntilDate.getTime())) {
-        this.logger.error(`Invalid date received for pharmacy ${data.name}: ${data.dutyFrom} - ${data.dutyUntil}`);
-        continue; 
-      }
-
-      const updateData: any = {
-        ...data,
-        city: mappedCity,
-        source_type: 'COLFARJUY_OFFICIAL',
-        isOnDuty: data.isOnDuty ?? true,
-        dutyFrom: dutyFromDate,
-        dutyUntil: dutyUntilDate,
-        openingHours: data.openingHours,
-        isPermanentlyOnDuty: data.isPermanentlyOnDuty ?? false,
-        isVoluntary: data.isVoluntary ?? false,
-        updatedAt: new Date(),
-      };
-
-      const updateOps: any = { $set: updateData };
-
-      if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
-        updateData.location = {
-          type: 'Point',
-          coordinates: [geo.lng, geo.lat],
+        // Geocoding is the bottleneck. We parallelize it within the chunk.
+        const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity);
+        
+        const updateData: any = {
+          ...data,
+          city: mappedCity,
+          source_type: 'COLFARJUY_OFFICIAL',
+          isOnDuty: data.isOnDuty ?? true,
+          dutyFrom: dutyFromDate,
+          dutyUntil: dutyUntilDate,
+          openingHours: data.openingHours,
+          isPermanentlyOnDuty: data.isPermanentlyOnDuty ?? false,
+          isVoluntary: data.isVoluntary ?? false,
+          updatedAt: new Date(),
         };
-        updateData.georef = {
-          provinciaId: geo.provinciaId,
-          municipioId: geo.municipioId,
-          localidadId: geo.localidadId,
+
+        const filter = { 
+          name: data.name, 
+          city: mappedCity,
+          dutyFrom: updateData.dutyFrom,
+          dutyUntil: updateData.dutyUntil 
         };
-      } else {
-        delete updateData.location;
-        updateOps.$unset = { location: "" };
-      }
 
-      const filter = { 
-        name: data.name, 
-        city: mappedCity,
-        dutyFrom: updateData.dutyFrom,
-        dutyUntil: updateData.dutyUntil 
-      };
+        const updateOp: any = {
+          updateOne: {
+            filter,
+            update: { $set: updateData },
+            upsert: true
+          }
+        };
 
-      await this.pharmacyModel.findOneAndUpdate(
-        filter,
-        updateOps,
-        { upsert: true, new: true }
-      );
+        if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+          updateData.location = {
+            type: 'Point',
+            coordinates: [geo.lng, geo.lat],
+          };
+          updateData.georef = {
+            provinciaId: geo.provinciaId,
+            municipioId: geo.municipioId,
+            localidadId: geo.localidadId,
+          };
+        } else {
+          delete updateData.location;
+          updateOp.updateOne.update.$unset = { location: "" };
+        }
 
-      if (pharmacies.indexOf(data) < pharmacies.length - 1) {
+        return updateOp;
+      });
+
+      const results = await Promise.all(chunkPromises);
+      results.forEach(op => { if (op) bulkOps.push(op); });
+
+      // Respect rate limits of geocoding services between chunks
+      if (i + BATCH_SIZE < pharmacies.length) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    this.logger.log(`Saved/Updated ${pharmacies.length} pharmacies from Colfarjuy.`);
+
+    if (bulkOps.length > 0) {
+      await this.pharmacyModel.bulkWrite(bulkOps);
+      this.logger.log(`Successfully persisted batch of ${bulkOps.length} pharmacies via bulkWrite.`);
+    }
+  }
+
+  private async saveNormalizedPharmacies(pharmacies: any[]): Promise<void> {
+    // Deprecated in favor of saveNormalizedPharmaciesBatch
+    return this.saveNormalizedPharmaciesBatch(pharmacies);
   }
 
   private mapCityName(city?: string): string {

@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schemas/pharmacy.schema';
 import { PharmacyReport, PharmacyReportDocument } from '../../infrastructure/database/schemas/pharmacy-report.schema';
+import { User, UserDocument } from '../../infrastructure/database/schemas/user.schema';
 import { GeoValidationService } from '../../infrastructure/security/geo-validation.service';
 import { ReputationService } from '../../infrastructure/security/reputation.service';
 import { BadRequestException } from '@nestjs/common';
@@ -13,6 +14,7 @@ export class SubmitPharmacyReportHandler implements ICommandHandler<SubmitPharma
   constructor(
     @InjectModel(Pharmacy.name) private pharmacyModel: Model<PharmacyDocument>,
     @InjectModel(PharmacyReport.name) private reportModel: Model<PharmacyReportDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly geoValidation: GeoValidationService,
     private readonly reputationService: ReputationService,
   ) {}
@@ -37,6 +39,17 @@ export class SubmitPharmacyReportHandler implements ICommandHandler<SubmitPharma
     const reputation = await this.reputationService.getDeviceReputation(deviceId);
     const isShadowBanned = this.reputationService.isShadowBanned(reputation);
 
+    // Layer 3: Points & User Reputation
+    let userPoints = 0;
+    if (userId) {
+      const user = await this.userModel.findByIdAndUpdate(
+        userId,
+        { $inc: { trustScore: 10 } },
+        { new: true }
+      );
+      userPoints = user?.trustScore || 0;
+    }
+
     const reportData: Partial<PharmacyReport> = {
       pharmacyId,
       deviceId,
@@ -45,6 +58,8 @@ export class SubmitPharmacyReportHandler implements ICommandHandler<SubmitPharma
       isOnDuty,
       imageUrl,
       isSilentlyDiscarded: isShadowBanned,
+      // Confidence is based on user points. If user has > 300, report is 1.0 (max)
+      confidence: userPoints >= 300 ? 1.0 : 0.1,
     };
 
     await this.reportModel.create(reportData);

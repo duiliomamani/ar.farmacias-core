@@ -5,23 +5,6 @@ export class PharmacyReport {
   id?: string;
 
   @ApiProperty()
-  pharmacyId!: string;
-
-  @ApiProperty()
-  deviceId!: string;
-
-  @ApiPropertyOptional()
-  userId?: string;
-
-  @ApiProperty({
-    example: { type: 'Point', coordinates: [-65.30, -24.18] },
-  })
-  userLocation!: {
-    type: 'Point';
-    coordinates: [number, number];
-  };
-
-  @ApiProperty()
   isOnDuty!: boolean;
 
   @ApiProperty()

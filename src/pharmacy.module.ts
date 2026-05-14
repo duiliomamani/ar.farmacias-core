@@ -15,6 +15,7 @@ import { GeoValidationService } from './infrastructure/security/geo-validation.s
 import { ReputationService } from './infrastructure/security/reputation.service';
 import { ColfarjuyScraperService } from './application/services/colfarjuy-scraper.service';
 import { ConfigModule } from '@nestjs/config';
+import { UserModule } from './user.module';
 
 import { ScrapeColfarjuyHandler } from './application/commands/scrape-colfarjuy.handler';
 import { SubmitPharmacyReportHandler } from './application/commands/submit-pharmacy-report.handler';
@@ -33,6 +34,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     ]),
     ConfigModule,
     CqrsModule,
+    UserModule,
   ],
   controllers: [PharmacyController, PharmacyReportController, ScrapingController],
   providers: [

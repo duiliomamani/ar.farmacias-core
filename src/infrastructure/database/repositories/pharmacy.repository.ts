@@ -89,24 +89,39 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
   private async mapToEntityWithReports(doc: PharmacyDocument): Promise<PharmacyEntity> {
     const entity = this.mapToEntity(doc);
     
-    // Fetch last 5 community reports that are not discarded
-    const reports = await this.reportModel
-      .find({ pharmacyId: doc._id, isSilentlyDiscarded: false })
-      .sort({ createdAt: -1 })
-      .limit(5);
+    // Fetch recent community reports (last 4 hours)
+    const fourHoursAgo = new Date();
+    fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
 
-    entity.communityReports = reports.map(r => new PharmacyReportEntity({
+    const reports = await this.reportModel
+      .find({ 
+        pharmacyId: doc._id, 
+        isSilentlyDiscarded: false,
+        createdAt: { $gte: fourHoursAgo }
+      })
+      .sort({ createdAt: -1 });
+
+    entity.communityReports = reports.slice(0, 5).map(r => new PharmacyReportEntity({
       id: r._id.toString(),
-      pharmacyId: r.pharmacyId.toString(),
-      deviceId: r.deviceId,
-      userId: r.userId,
-      userLocation: r.userLocation,
       isOnDuty: r.isOnDuty,
       confidence: r.confidence,
       source: r.source,
       imageUrl: r.imageUrl,
       createdAt: (r as any).createdAt,
     }));
+
+    // Calculate Aggregate Confidence
+    // 1. High-reputation user report (confidence 1.0)
+    const hasHighTrustReport = reports.some(r => r.confidence >= 1.0);
+    
+    // 2. Quantity of reports (10+ reports)
+    const hasConsensus = reports.length >= 10;
+
+    if (hasHighTrustReport || hasConsensus) {
+      entity.statusConfidence = 1.0;
+    } else {
+      entity.statusConfidence = Math.min(reports.length * 0.1, 0.9);
+    }
 
     return entity;
   }
@@ -116,17 +131,13 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
       id: doc._id.toString(),
       name: doc.name,
       city: doc.city,
-      originalAddress: doc.originalAddress,
+      address: doc.originalAddress,
       location: doc.location,
-      georef: doc.georef,
       isOnDuty: doc.isOnDuty,
       dutyFrom: doc.dutyFrom,
       dutyUntil: doc.dutyUntil,
       openingHours: doc.openingHours,
-      isPermanentlyOnDuty: doc.isPermanentlyOnDuty,
       isVoluntary: doc.isVoluntary,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
     });
   }
 }

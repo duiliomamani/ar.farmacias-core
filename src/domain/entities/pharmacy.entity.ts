@@ -12,7 +12,7 @@ export class Pharmacy {
   city?: string;
 
   @ApiProperty()
-  originalAddress!: string;
+  address!: string;
 
   @ApiProperty({
     example: { type: 'Point', coordinates: [-65.30, -24.18] },
@@ -20,15 +20,6 @@ export class Pharmacy {
   location!: {
     type: 'Point';
     coordinates: [number, number]; // [longitude, latitude]
-  };
-
-  @ApiProperty()
-  georef!: {
-    provinciaId: string;
-    municipioId: string;
-    localidadId: string;
-    streetName?: string;
-    streetNumber?: string;
   };
 
   @ApiProperty()
@@ -44,19 +35,13 @@ export class Pharmacy {
   openingHours?: string;
 
   @ApiPropertyOptional()
-  isPermanentlyOnDuty?: boolean;
-
-  @ApiPropertyOptional()
   isVoluntary?: boolean;
+
+  @ApiPropertyOptional({ description: 'Calculated trust score for the current status (0 to 1)' })
+  statusConfidence?: number;
 
   @ApiPropertyOptional({ type: [PharmacyReport] })
   communityReports?: PharmacyReport[];
-
-  @ApiProperty()
-  createdAt!: Date;
-
-  @ApiProperty()
-  updatedAt!: Date;
 
   constructor(partial: Partial<Pharmacy>) {
     Object.assign(this, partial);
