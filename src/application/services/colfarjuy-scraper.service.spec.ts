@@ -2,19 +2,27 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ColfarjuyScraperService } from './colfarjuy-scraper.service';
 import axios from 'axios';
 import * as pdf from 'pdf-parse';
-import { chromium } from 'playwright-extra';
+import { chromium } from 'playwright-core';
+import { addExtra } from 'playwright-extra';
 
 jest.mock('axios');
 jest.mock('pdf-parse');
-jest.mock('playwright-extra', () => ({
+jest.mock('playwright-core', () => ({
   chromium: {
-    use: jest.fn(),
     launch: jest.fn(),
   },
+}));
+jest.mock('playwright-extra', () => ({
+  addExtra: jest.fn().mockReturnValue({
+    use: jest.fn(),
+    launch: jest.fn(),
+  }),
 }));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedChromium = chromium as jest.Mocked<any>;
+const mockedAddExtra = addExtra as jest.MockedFunction<typeof addExtra>;
+const mockedChromiumStealth = mockedAddExtra(chromium) as any;
 
 describe('ColfarjuyScraperService', () => {
   let service: ColfarjuyScraperService;
@@ -42,7 +50,7 @@ describe('ColfarjuyScraperService', () => {
     }).compile();
 
     service = module.get<ColfarjuyScraperService>(ColfarjuyScraperService);
-    mockedChromium.launch.mockResolvedValue(mockBrowser);
+    mockedChromiumStealth.launch.mockResolvedValue(mockBrowser);
   });
 
   afterEach(() => {

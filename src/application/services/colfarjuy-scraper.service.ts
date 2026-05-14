@@ -2,10 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as pdf from 'pdf-parse';
-import { chromium } from 'playwright-extra';
+import { chromium } from 'playwright-core';
+import { addExtra } from 'playwright-extra';
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
-chromium.use(StealthPlugin());
+const chromiumStealth = addExtra(chromium);
+chromiumStealth.use(StealthPlugin());
 
 @Injectable()
 export class ColfarjuyScraperService {
@@ -32,7 +34,7 @@ export class ColfarjuyScraperService {
     try {
       this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
       
-      browser = await chromium.launch({ headless: true });
+      browser = await chromiumStealth.launch({ headless: true });
       const context = await browser.newContext({
         userAgent: this.COMMON_HEADERS['User-Agent'],
         viewport: { width: 1280, height: 720 }
