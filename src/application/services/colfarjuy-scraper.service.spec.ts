@@ -68,7 +68,7 @@ describe('ColfarjuyScraperService', () => {
 
       const result = await service.scrapeRegion('Capital');
 
-      expect(mockedChromium.launch).toHaveBeenCalled();
+      expect(mockedChromiumStealth.launch).toHaveBeenCalled();
       expect(mockPage.goto).toHaveBeenCalledWith(
         'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026',
         expect.anything()
@@ -109,7 +109,7 @@ describe('ColfarjuyScraperService', () => {
     });
 
     it('should handle errors and close browser', async () => {
-      mockedChromium.launch.mockRejectedValue(new Error('Browser failed'));
+      mockedChromiumStealth.launch.mockRejectedValue(new Error('Browser failed'));
       await expect(service.scrapeRegion('Capital')).rejects.toThrow('Browser failed');
       // Browser didn't launch, so close shouldn't be called on it
     });
