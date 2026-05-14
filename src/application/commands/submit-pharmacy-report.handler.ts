@@ -39,7 +39,21 @@ export class SubmitPharmacyReportHandler implements ICommandHandler<SubmitPharma
     const reputation = await this.reputationService.getDeviceReputation(deviceId);
     const isShadowBanned = this.reputationService.isShadowBanned(reputation);
 
-    // Layer 3: Points & User Reputation
+    // Layer 3: Anti-Spam (One report per pharmacy per day)
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+    const existingReport = await this.reportModel.findOne({
+      pharmacyId,
+      userId,
+      createdAt: { $gte: twentyFourHoursAgo }
+    });
+
+    if (existingReport) {
+      throw new BadRequestException('You have already reported for this pharmacy in the last 24 hours');
+    }
+
+    // Layer 4: Points & User Reputation
     let userPoints = 0;
     if (userId) {
       const user = await this.userModel.findByIdAndUpdate(

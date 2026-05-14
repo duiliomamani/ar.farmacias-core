@@ -4,9 +4,9 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Pharmacy } from '../../infrastructure/database/schemas/pharmacy.schema';
 import { PharmacyReport } from '../../infrastructure/database/schemas/pharmacy-report.schema';
 import { User } from '../../infrastructure/database/schemas/user.schema';
+import { SubmitPharmacyReportCommand } from './submit-pharmacy-report.command';
 import { GeoValidationService } from '../../infrastructure/security/geo-validation.service';
 import { ReputationService } from '../../infrastructure/security/reputation.service';
-import { SubmitPharmacyReportCommand } from './submit-pharmacy-report.command';
 import { BadRequestException } from '@nestjs/common';
 
 describe('SubmitPharmacyReportHandler', () => {
@@ -23,6 +23,7 @@ describe('SubmitPharmacyReportHandler', () => {
 
   const mockReportModel = {
     create: jest.fn(),
+    findOne: jest.fn(),
   };
 
   const mockUserModel = {
@@ -65,6 +66,7 @@ describe('SubmitPharmacyReportHandler', () => {
   it('should successfully submit a report', async () => {
     const command = new SubmitPharmacyReportCommand('id', 1, 2, 'device', true);
     mockPharmacyModel.findById.mockResolvedValue({ location: { coordinates: [2, 1] } });
+    mockReportModel.findOne.mockResolvedValue(null);
     
     await handler.execute(command);
 
@@ -73,9 +75,18 @@ describe('SubmitPharmacyReportHandler', () => {
     expect(mockReportModel.create).toHaveBeenCalled();
   });
 
+  it('should throw BadRequestException if user already reported today', async () => {
+    const command = new SubmitPharmacyReportCommand('pharmacy123', 1, 2, 'device', true, undefined, 'user123');
+    mockPharmacyModel.findById.mockResolvedValue({ location: { coordinates: [2, 1] } });
+    mockReportModel.findOne.mockResolvedValue({ _id: 'existing' });
+    
+    await expect(handler.execute(command)).rejects.toThrow('already reported');
+  });
+
   it('should award 10 points to logged user', async () => {
     const command = new SubmitPharmacyReportCommand('id', 1, 2, 'device', true, undefined, 'user123');
     mockPharmacyModel.findById.mockResolvedValue({ location: { coordinates: [2, 1] } });
+    mockReportModel.findOne.mockResolvedValue(null);
     mockUserModel.findByIdAndUpdate.mockResolvedValue({ trustScore: 110 });
     
     await handler.execute(command);
@@ -93,6 +104,7 @@ describe('SubmitPharmacyReportHandler', () => {
   it('should set high confidence for trusted users', async () => {
     const command = new SubmitPharmacyReportCommand('id', 1, 2, 'device', true, undefined, 'user123');
     mockPharmacyModel.findById.mockResolvedValue({ location: { coordinates: [2, 1] } });
+    mockReportModel.findOne.mockResolvedValue(null);
     mockUserModel.findByIdAndUpdate.mockResolvedValue({ trustScore: 350 });
     
     await handler.execute(command);
