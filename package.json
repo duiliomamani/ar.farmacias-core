@@ -35,6 +35,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.2",
     "@nestjs/throttler": "^6.5.0",
+    "@sparticuz/chromium": "^148.0.0",
     "axios": "^1.7.9",
     "cheerio": "^1.2.0",
     "class-transformer": "^0.5.1",

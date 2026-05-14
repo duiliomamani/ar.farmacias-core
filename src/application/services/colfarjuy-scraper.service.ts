@@ -29,12 +29,25 @@ export class ColfarjuyScraperService {
     try {
       this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
       
+      let executablePath: string | undefined;
+      
+      // Vercel / Serverless Detection
+      if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        this.logger.log(`[Scraper] Serverless environment detected. Loading @sparticuz/chromium...`);
+        const chromiumServerless = require('@sparticuz/chromium');
+        executablePath = await chromiumServerless.executablePath();
+      }
+
       browser = await chromium.launch({ 
         headless: true,
+        executablePath,
         args: [
           '--disable-blink-features=AutomationControlled',
           '--no-sandbox',
-          '--disable-setuid-sandbox'
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu'
         ]
       });
 
