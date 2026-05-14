@@ -44,7 +44,7 @@ describe('PharmacyController', () => {
       const result = await controller.getNearby(dto);
 
       expect(queryBus.execute).toHaveBeenCalledWith(expect.any(GetNearbyPharmaciesQuery));
-      expect(result).toEqual(mockResult);
+      expect(result).toEqual({ data: mockResult, isSuccessful: true, errors: [] });
     });
 
     it('should use default radius if not provided', async () => {
