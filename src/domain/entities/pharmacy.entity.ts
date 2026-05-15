@@ -37,6 +37,9 @@ export class Pharmacy {
   @ApiPropertyOptional()
   isVoluntary?: boolean;
 
+  @ApiPropertyOptional()
+  isPermanentlyOnDuty?: boolean;
+
   @ApiPropertyOptional({ description: 'Calculated trust score for the current status (0 to 1)' })
   statusConfidence?: number;
 

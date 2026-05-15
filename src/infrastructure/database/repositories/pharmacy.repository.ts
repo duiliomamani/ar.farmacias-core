@@ -32,7 +32,37 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
   }
 
   async findNearby(lat: number, lng: number, radiusInMeters: number, date?: Date): Promise<PharmacyEntity[]> {
-    const targetTime = date || new Date();
+    let queryDateFilter: any;
+
+    if (date) {
+      // If a specific date is provided, we look for anything overlapping that entire day (UTC)
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      queryDateFilter = {
+        $or: [
+          { isPermanentlyOnDuty: true },
+          {
+            dutyFrom: { $lte: endOfDay },
+            dutyUntil: { $gte: startOfDay },
+          },
+        ],
+      };
+    } else {
+      // If no date is provided, we look for pharmacies on duty RIGHT NOW
+      const now = new Date();
+      queryDateFilter = {
+        $or: [
+          { isPermanentlyOnDuty: true },
+          {
+            dutyFrom: { $lte: now },
+            dutyUntil: { $gte: now },
+          },
+        ],
+      };
+    }
 
     const query: any = {
       location: {
@@ -45,13 +75,7 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
         },
       },
       isOnDuty: true,
-      $or: [
-        { isPermanentlyOnDuty: true },
-        {
-          dutyFrom: { $lte: targetTime },
-          dutyUntil: { $gte: targetTime },
-        },
-      ],
+      ...queryDateFilter,
     };
 
     const pharmacies = await this.model.find(query);
@@ -138,6 +162,7 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
       dutyUntil: doc.dutyUntil,
       openingHours: doc.openingHours,
       isVoluntary: doc.isVoluntary,
+      isPermanentlyOnDuty: doc.isPermanentlyOnDuty,
     });
   }
 }

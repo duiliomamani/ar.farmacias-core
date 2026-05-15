@@ -32,11 +32,11 @@ export class ColfarjuyScraperService {
   async scrapeRegion(region: 'Capital' | 'Interior'): Promise<ScrapedContent[]> {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
     let browser: Browser | undefined;
-    
+
     try {
       this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
-      
-      browser = await chromium.launch({ 
+
+      browser = await chromium.launch({
         headless: true,
         args: [
           '--disable-blink-features=AutomationControlled',
@@ -56,17 +56,17 @@ export class ColfarjuyScraperService {
       await context.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       });
-      
+
       const page = await context.newPage();
       this.logger.log(`[Scraper] Navigating to: ${url}`);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      
+
       // Wait for Cloudflare/scripts
       await page.waitForTimeout(10000);
 
       const html = await page.content();
       const $ = cheerio.load(html);
-      
+
       if (region === 'Capital') {
         return await this.scrapeCapitalContent($);
       } else {
@@ -90,11 +90,11 @@ export class ColfarjuyScraperService {
   private async scrapeCapitalContent($: cheerio.CheerioAPI): Promise<ScrapedContent[]> {
     this.logger.log('[Scraper] Extracting Capital content...');
     const results: ScrapedContent[] = [];
-    
+
     // Capital usually has text directly or a main PDF
     const contentContainer = $('.item-page, .article-content, #main-content');
     const rawText = contentContainer.text().trim();
-    
+
     // Check for PDFs in Capital just in case
     const pdfLinks = this.extractPdfLinks($);
     if (pdfLinks.length > 0) {
@@ -171,12 +171,13 @@ export class ColfarjuyScraperService {
 
   private inferCityFromText(text: string): string | undefined {
     if (!text) return undefined;
-    const cities = ['Palpala', 'Palpalá', 'Perico', 'El Carmen', 'Monterrico', 'San Pedro', 'La Esperanza', 'Ledesma', 'Libertador', 'Fraile Pintado', 'Humahuaca', 'Tilcara', 'La Quiaca', 'Abra Pampa'];
+    const cities = ['Palpala', 'Palpalá', 'Perico', 'El Carmen', 'Monterrico', 'San Pedro', 'La Esperanza', 'Ledesma', 'Libertador General San Martín', 'Fraile Pintado', 'Humahuaca', 'Tilcara', 'La Quiaca', 'Abra Pampa'];
     const found = cities.find(city => text.toLowerCase().includes(city.toLowerCase()));
-    
+
     if (found?.toLowerCase().includes('palpala')) return 'Palpalá';
-    if (found?.toLowerCase().includes('libertador') || found?.toLowerCase().includes('ledesma')) return 'Libertador Gral. San Martín';
-    
+    if (found?.toLowerCase().includes('lgsm') || found?.toLowerCase().includes('ledesma')) return 'Libertador Gral. San Martín';
+
+
     return found;
   }
 
@@ -187,7 +188,7 @@ export class ColfarjuyScraperService {
         responseType: 'arraybuffer',
         headers: this.COMMON_HEADERS
       });
-      
+
       const pdfParser = (pdf as any).default || pdf;
       const data = await pdfParser(Buffer.from(response.data));
       return data.text;

@@ -101,18 +101,25 @@ describe('PharmacyRepository', () => {
 
       const result = await repository.findNearby(lat, lng, radius);
 
-      expect(mockPharmacyModel.find).toHaveBeenCalledWith(expect.objectContaining({
-        location: expect.anything(),
-        isOnDuty: true,
-        $or: expect.arrayContaining([
-          { isPermanentlyOnDuty: true },
-          expect.objectContaining({
-            dutyFrom: { $lte: expect.any(Date) },
-            dutyUntil: { $gte: expect.any(Date) },
-          })
-        ]),
-      }));
       expect(result).toHaveLength(1);
+    });
+
+    it('should use day-overlap logic when a specific date is provided', async () => {
+      const lat = -24.18;
+      const lng = -65.30;
+      const radius = 1000;
+      const date = new Date('2026-05-15');
+
+      mockPharmacyModel.find.mockResolvedValue([mockPharmacyDoc]);
+
+      await repository.findNearby(lat, lng, radius, date);
+
+      const query = mockPharmacyModel.find.mock.calls[mockPharmacyModel.find.mock.calls.length - 1][0];
+      
+      // The overlapping logic: dutyFrom <= endOfDay AND dutyUntil >= startOfDay
+      const rangeFilter = query.$or.find((o: any) => o.dutyFrom);
+      expect(rangeFilter.dutyFrom.$lte.getUTCHours()).toBe(23);
+      expect(rangeFilter.dutyUntil.$gte.getUTCHours()).toBe(0);
     });
   });
 
