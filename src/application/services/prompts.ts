@@ -28,7 +28,7 @@ REPETITION & EXPANSION RULES (MANDATORY):
    - Set isPermanentlyOnDuty: false.
 4. ATENCIÓN PERMANENTE (24hs):
    - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
-   - Hours: 00:00 ART to 23:59 ART.
+   - Set Opening hours: 24hs
    - Set isPermanentlyOnDuty: true.
    - Set isOnDuty: true.
    - Set isVoluntary: false.
