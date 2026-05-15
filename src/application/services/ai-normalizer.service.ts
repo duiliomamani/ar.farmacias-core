@@ -14,6 +14,7 @@ export interface NormalizedPharmacy {
   dutyUntil: string; // ISO format
   openingHours?: string; // Human readable string
   isVoluntary?: boolean;
+  isPermanentlyOnDuty?: boolean;
 }
 
 @Injectable()
@@ -61,11 +62,9 @@ export class AiNormalizerService {
       dutyFrom: z.string().optional().describe("Optional ISO 8601 date and time when the duty starts."),
       dutyUntil: z.string().optional().describe("Optional ISO 8601 date and time when the duty ends."),
       openingHours: z.string().optional().describe("Human readable opening hours (e.g. '08:00 a 08:00 del día siguiente')."),
+      isPermanentlyOnDuty: z.boolean().optional().describe("Whether the pharmacy is permanently on duty (24hs)."),
+      isVoluntary: z.boolean().optional().describe("Whether the shift is a voluntary shift (e.g. Saturday 17:00 to 21:00, Listado B/C)."),
     };
-
-    if (region === 'Interior') {
-      schemaFields.isVoluntary = z.boolean().optional().describe("Whether the shift is a voluntary shift (e.g. Saturday 17:00 to 21:00).");
-    }
 
     const pharmacyItemSchema = z.object(schemaFields);
 
