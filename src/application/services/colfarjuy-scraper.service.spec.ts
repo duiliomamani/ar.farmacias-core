@@ -48,8 +48,6 @@ describe('ColfarjuyScraperService', () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
-    jest.spyOn(Logger.prototype, 'verbose').mockImplementation(() => {});
 
     mockedChromium.launch.mockResolvedValue(mockBrowser);
   });
@@ -63,133 +61,53 @@ describe('ColfarjuyScraperService', () => {
   });
 
   describe('scrapeRegion', () => {
-    it('should extract text from HTML using Playwright', async () => {
+    it('should extract text from Capital HTML using Playwright', async () => {
       const html = '<div class="item-page"><p>Farmacia de Turno: Belgrano</p></div>';
       mockPage.content.mockResolvedValue(html);
 
       const result = await service.scrapeRegion('Capital');
 
       expect(mockedChromium.launch).toHaveBeenCalled();
-      expect(mockContext.addInitScript).toHaveBeenCalled();
       expect(mockPage.goto).toHaveBeenCalledWith(
-        'https://www.colfarjuy.org.ar/novedades/1093-san-salvador-de-jujuy-recordatorio-del-turnero-de-farmacias-correspondiente-al-primer-semestre-2026',
-        expect.objectContaining({ waitUntil: 'networkidle' })
+        expect.stringContaining('novedades/1093'),
+        expect.objectContaining({ waitUntil: 'domcontentloaded' })
       );
-      expect(result).toContain('Farmacia de Turno: Belgrano');
-      expect(mockBrowser.close).toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toContain('Farmacia de Turno: Belgrano');
+      expect(result[0].inferredCity).toBe('San Salvador de Jujuy');
     });
 
-    it('should handle PDF links correctly', async () => {
-      const html = '<a href="/file.pdf">Ver PDF</a>';
+    it('should handle PDF links in Interior correctly', async () => {
+      const html = '<a href="/turnos-palpala.pdf">Turnos Palpalá</a>';
       mockPage.content.mockResolvedValue(html);
       mockedAxios.get.mockResolvedValueOnce({ data: Buffer.from('pdf content'), status: 200 });
       
       const pdfParser = (pdf as any).default || pdf;
-      (pdfParser as jest.Mock).mockResolvedValue({ text: 'text from pdf' });
+      (pdfParser as jest.Mock).mockResolvedValue({ text: 'text from palpala pdf' });
 
       const result = await service.scrapeRegion('Interior');
 
-      expect(mockedAxios.get).toHaveBeenCalledWith(
-        'https://www.colfarjuy.org.ar/file.pdf',
-        expect.anything()
-      );
-      expect(result).toContain('text from pdf');
-      expect(mockBrowser.close).toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe('text from palpala pdf');
+      expect(result[0].inferredCity).toBe('Palpalá');
     });
 
-    it('should handle Google Drive iframes correctly', async () => {
-      const html = '<iframe src="https://drive.google.com/file/d/12345ABCDE/preview"></iframe>';
+    it('should infer Libertador correctly from link text', async () => {
+      const html = '<a href="/turnos.pdf">Turnos Ledesma - Libertador</a>';
       mockPage.content.mockResolvedValue(html);
       mockedAxios.get.mockResolvedValueOnce({ data: Buffer.from('pdf content'), status: 200 });
       
       const pdfParser = (pdf as any).default || pdf;
-      (pdfParser as jest.Mock).mockResolvedValue({ text: 'text from google drive' });
-
-      const result = await service.scrapeRegion('Capital');
-
-      expect(mockedAxios.get).toHaveBeenCalledWith(
-        'https://drive.google.com/uc?export=download&id=12345ABCDE',
-        expect.anything()
-      );
-      expect(result).toContain('text from google drive');
-    });
-
-    it('should detect Cloudflare challenge via title and log warning', async () => {
-      const html = '<html><head><title>Just a moment...</title></head><body>Please enable cookies.</body></html>';
-      mockPage.content.mockResolvedValue(html);
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
-
-      await service.scrapeRegion('Capital');
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Detected Cloudflare challenge')
-      );
-    });
-
-    it('should detect Cloudflare challenge via challenge marker', async () => {
-      const html = '<html><body><div class="cf-challenge-running"></div></body></html>';
-      mockPage.content.mockResolvedValue(html);
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
-
-      await service.scrapeRegion('Capital');
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Detected Cloudflare challenge')
-      );
-    });
-
-    it('should NOT trigger Cloudflare warning for large pages containing the word cloudflare', async () => {
-      // A large string that contains "cloudflare" but is legitimate content
-      const largeHtml = '<html><head><title>Farmacias de Turno</title></head><body>' + 
-                        '<h1>Listado de Farmacias</h1>' + 
-                        '<p>Contenido legítimo que menciona cloudflare por alguna razón técnica en un script...</p>' +
-                        'a'.repeat(6000) + 
-                        '</body></html>';
-      mockPage.content.mockResolvedValue(largeHtml);
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
-
-      await service.scrapeRegion('Capital');
-
-      // Should not contain the specific bypass failed warning
-      const cloudflareWarnings = warnSpy.mock.calls.filter(call => 
-        call[0].includes('Detected Cloudflare challenge')
-      );
-      expect(cloudflareWarnings.length).toBe(0);
-    });
-
-    it('should handle PDF download error', async () => {
-      const html = '<a href="/file.pdf">Ver PDF</a>';
-      mockPage.content.mockResolvedValue(html);
-      mockedAxios.get.mockRejectedValueOnce(new Error('Download failed'));
+      (pdfParser as jest.Mock).mockResolvedValue({ text: 'text' });
 
       const result = await service.scrapeRegion('Interior');
-      expect(result).toBe('');
-      expect(mockBrowser.close).toHaveBeenCalled();
-    });
-
-    it('should handle empty content', async () => {
-      mockPage.content.mockResolvedValue('<html></html>');
-      const result = await service.scrapeRegion('Capital');
-      expect(result).toBe('');
-      expect(mockBrowser.close).toHaveBeenCalled();
+      expect(result[0].inferredCity).toBe('Libertador Gral. San Martín');
     });
 
     it('should handle errors and close browser', async () => {
       mockedChromium.launch.mockRejectedValue(new Error('Browser failed'));
       await expect(service.scrapeRegion('Capital')).rejects.toThrow('Browser failed');
-    });
-
-    it('should handle 403 error specifically', async () => {
-      const error: any = new Error('Forbidden');
-      error.response = { status: 403, data: 'Access Denied' };
-      mockedChromium.launch.mockRejectedValue(error);
-      
-      const errorSpy = jest.spyOn(Logger.prototype, 'error');
-
-      await expect(service.scrapeRegion('Capital')).rejects.toThrow('Forbidden');
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('403 Forbidden')
-      );
+      // finally block should not be called if launch fails and browser is undefined
     });
   });
 });

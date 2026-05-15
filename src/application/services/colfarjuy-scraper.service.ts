@@ -2,7 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as pdf from 'pdf-parse';
-import { chromium } from 'playwright-core';
+import { chromium, Browser } from 'playwright-core';
+
+export interface ScrapedContent {
+  text: string;
+  source?: string;
+  inferredCity?: string;
+}
 
 @Injectable()
 export class ColfarjuyScraperService {
@@ -21,11 +27,12 @@ export class ColfarjuyScraperService {
   constructor() { }
 
   /**
-   * Scrapes a specific region's schedule using Playwright to bypass Cloudflare
+   * Orchestrates scraping based on region
    */
-  async scrapeRegion(region: 'Capital' | 'Interior'): Promise<string> {
+  async scrapeRegion(region: 'Capital' | 'Interior'): Promise<ScrapedContent[]> {
     const url = region === 'Capital' ? this.URL_CAPITAL : this.URL_INTERIOR;
-    let browser;
+    let browser: Browser | undefined;
+    
     try {
       this.logger.log(`[Scraper] Starting Playwright scrape for region [${region}]`);
       
@@ -43,100 +50,31 @@ export class ColfarjuyScraperService {
       const context = await browser.newContext({
         userAgent: this.COMMON_HEADERS['User-Agent'],
         viewport: { width: 1280, height: 720 },
-        deviceScaleFactor: 1,
       });
 
-      // Manual Evasion: Remove navigator.webdriver
+      // Evasion: Remove navigator.webdriver
       await context.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', {
-          get: () => undefined,
-        });
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       });
       
       const page = await context.newPage();
-      
-      // Navigate and wait for basic DOM load to avoid timeouts on slow assets or trackers
-      // We use 'domcontentloaded' and then a manual wait for Cloudflare
       this.logger.log(`[Scraper] Navigating to: ${url}`);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
       
-      // Wait for a few seconds to allow Cloudflare challenge to resolve and scripts to run
-      this.logger.log(`[Scraper] DOM loaded. Waiting 10s for Cloudflare/scripts...`);
+      // Wait for Cloudflare/scripts
       await page.waitForTimeout(10000);
 
       const html = await page.content();
       const $ = cheerio.load(html);
-      const pageTitle = $('title').text();
-
-      this.logger.log(`[Scraper] Page content captured. Size: ${html.length} bytes. Title: "${pageTitle}"`);
-
-      const isCloudflareChallenge = 
-        pageTitle.includes('Just a moment...') || 
-        pageTitle.includes('Attention Required!') ||
-        html.includes('cf-challenge-running') ||
-        (html.includes('cloudflare') && html.length < 5000); // Challenge pages are usually small
-
-      if (isCloudflareChallenge) {
-        this.logger.warn(`[Scraper] ⚠️ Detected Cloudflare challenge in captured content. Bypass might have failed.`);
-      }
-
-      // Scenario B: Look for direct PDF links or Google Drive iframes
-      const pdfLinks: string[] = [];
-
-      // Direct links
-      $('a[href$=".pdf"]').each((_, el) => {
-        const href = $(el).attr('href');
-        if (href) {
-          pdfLinks.push(href.startsWith('http') ? href : `https://www.colfarjuy.org.ar${href}`);
-        }
-      });
-
-      // Google Drive Iframes
-      $('iframe[src*="drive.google.com"]').each((_, el) => {
-        const src = $(el).attr('src');
-        if (src) {
-          // Extract ID from https://drive.google.com/file/d/FILE_ID/preview
-          const match = src.match(/\/file\/d\/(.+?)\/preview/);
-          if (match && match[1]) {
-            pdfLinks.push(`https://drive.google.com/uc?export=download&id=${match[1]}`);
-          }
-        }
-      });
-
-      let rawText = '';
-
-      if (pdfLinks.length > 0) {
-        this.logger.log(`[Scraper] Found ${pdfLinks.length} PDF sources. Preparing to parse them...`);
-        for (const pdfUrl of pdfLinks) {
-          const pdfContent = await this.downloadAndParsePdf(pdfUrl);
-          rawText += pdfContent + '\n';
-        }
+      
+      if (region === 'Capital') {
+        return await this.scrapeCapitalContent($);
       } else {
-        // Scenario A: Extract text from standard containers
-        this.logger.log('[Scraper] No PDFs found. Attempting to extract text from raw HTML content...');
-        const contentContainer = $('.item-page, .article-content, #main-content');
-        rawText = contentContainer.find('p, table, div').text();
+        return await this.scrapeInteriorContent($);
       }
-
-      if (!rawText.trim()) {
-        this.logger.warn(`[Scraper] ❌ Warning: No text content found at ${url}`);
-        return '';
-      }
-
-      this.logger.log(`[Scraper] ✅ Successfully extracted ${rawText.length} characters of raw text for ${region}.`);
-      return rawText;
 
     } catch (error: any) {
-      if (error.response?.status === 403) {
-        const responseData = error.response.data;
-        this.logger.error("Error scraping article : ", error.response.text)
-        if (typeof responseData === 'string') {
-          this.logger.error(`[Scraper] 403 Forbidden - Response body starts with: ${responseData.substring(0, 500)}`);
-        } else {
-          this.logger.error(`[Scraper] 403 Forbidden - Response body: ${JSON.stringify(responseData, null, 2)}`);
-        }
-      }
-      this.logger.error(`Error scraping article ${url}: ${error.message}`, error.stack);
+      this.logger.error(`[Scraper] Error scraping ${region} at ${url}: ${error.message}`);
       throw error;
     } finally {
       if (browser) {
@@ -146,22 +84,115 @@ export class ColfarjuyScraperService {
     }
   }
 
+  /**
+   * Specialized scraping for Capital region (Mainly grid/text)
+   */
+  private async scrapeCapitalContent($: cheerio.CheerioAPI): Promise<ScrapedContent[]> {
+    this.logger.log('[Scraper] Extracting Capital content...');
+    const results: ScrapedContent[] = [];
+    
+    // Capital usually has text directly or a main PDF
+    const contentContainer = $('.item-page, .article-content, #main-content');
+    const rawText = contentContainer.text().trim();
+    
+    // Check for PDFs in Capital just in case
+    const pdfLinks = this.extractPdfLinks($);
+    if (pdfLinks.length > 0) {
+      for (const pdf of pdfLinks) {
+        const text = await this.downloadAndParsePdf(pdf.url);
+        if (text) results.push({ text, source: pdf.url, inferredCity: 'San Salvador de Jujuy' });
+      }
+    }
+
+    if (rawText && results.length === 0) {
+      results.push({ text: rawText, inferredCity: 'San Salvador de Jujuy' });
+    }
+
+    return results;
+  }
+
+  /**
+   * Specialized scraping for Interior region (Multiple PDFs by city)
+   */
+  private async scrapeInteriorContent($: cheerio.CheerioAPI): Promise<ScrapedContent[]> {
+    this.logger.log('[Scraper] Extracting Interior content (multi-PDF)...');
+    const results: ScrapedContent[] = [];
+    const pdfLinks = this.extractPdfLinks($);
+
+    for (const pdf of pdfLinks) {
+      const text = await this.downloadAndParsePdf(pdf.url);
+      if (text) {
+        const inferredCity = this.inferCityFromText(pdf.linkText);
+        results.push({
+          text,
+          source: pdf.url,
+          inferredCity
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Helper to extract all PDF and Google Drive links
+   */
+  private extractPdfLinks($: cheerio.CheerioAPI): { url: string, linkText: string }[] {
+    const links: { url: string, linkText: string }[] = [];
+
+    // Standard PDF links
+    $('a[href$=".pdf"]').each((_, el) => {
+      const href = $(el).attr('href');
+      const text = $(el).text().trim();
+      if (href) {
+        links.push({
+          url: href.startsWith('http') ? href : `https://www.colfarjuy.org.ar${href}`,
+          linkText: text
+        });
+      }
+    });
+
+    // Google Drive Iframes
+    $('iframe[src*="drive.google.com"]').each((_, el) => {
+      const src = $(el).attr('src');
+      if (src) {
+        const match = src.match(/\/file\/d\/(.+?)\/preview/);
+        if (match && match[1]) {
+          links.push({
+            url: `https://drive.google.com/uc?export=download&id=${match[1]}`,
+            linkText: 'Google Drive PDF'
+          });
+        }
+      }
+    });
+
+    return links;
+  }
+
+  private inferCityFromText(text: string): string | undefined {
+    if (!text) return undefined;
+    const cities = ['Palpala', 'Palpalá', 'Perico', 'El Carmen', 'Monterrico', 'San Pedro', 'La Esperanza', 'Ledesma', 'Libertador', 'Fraile Pintado', 'Humahuaca', 'Tilcara', 'La Quiaca', 'Abra Pampa'];
+    const found = cities.find(city => text.toLowerCase().includes(city.toLowerCase()));
+    
+    if (found?.toLowerCase().includes('palpala')) return 'Palpalá';
+    if (found?.toLowerCase().includes('libertador') || found?.toLowerCase().includes('ledesma')) return 'Libertador Gral. San Martín';
+    
+    return found;
+  }
 
   private async downloadAndParsePdf(pdfUrl: string): Promise<string> {
     try {
-      this.logger.log(`[PDF Parser] Downloading PDF from: ${pdfUrl}`);
+      this.logger.log(`[PDF Parser] Downloading PDF: ${pdfUrl}`);
       const response = await axios.get(pdfUrl, {
         responseType: 'arraybuffer',
         headers: this.COMMON_HEADERS
       });
-      this.logger.log(`[PDF Parser] PDF downloaded. Size: ${response.data.byteLength} bytes. Parsing...`);
-      // Use the default export from pdf-parse or cast it as any to call it
+      
       const pdfParser = (pdf as any).default || pdf;
       const data = await pdfParser(Buffer.from(response.data));
-      this.logger.log(`[PDF Parser] ✅ PDF parsed successfully. Extracted ${data.text.length} characters.`);
       return data.text;
     } catch (error: any) {
-      this.logger.error(`Failed to parse PDF ${pdfUrl}: ${error.message}`);
+      this.logger.error(`[PDF Parser] Failed to parse ${pdfUrl}: ${error.message}`);
       return '';
     }
   }

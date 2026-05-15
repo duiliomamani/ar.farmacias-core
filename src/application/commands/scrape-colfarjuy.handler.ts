@@ -33,43 +33,50 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
 
   private async processRegion(region: 'Capital' | 'Interior'): Promise<void> {
     this.logger.log(`[Handler] >>> Starting processing for region: ${region} <<<`);
-    const rawText = await this.colfarjuyScraper.scrapeRegion(region);
-    if (!rawText) {
-      this.logger.warn(`[Handler] No raw text returned for ${region}. Skipping.`);
+    const scrapedResults = await this.colfarjuyScraper.scrapeRegion(region);
+    
+    if (!scrapedResults || scrapedResults.length === 0) {
+      this.logger.warn(`[Handler] No content scraped for ${region}. Skipping.`);
       return;
     }
 
-    // Calculate the Monday of the current week (local time)
+    // Calculate Monday of the current week (local time)
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
+    const dayOfWeek = now.getDay();
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    
     const mondayOfCurrentWeek = new Date(now);
     mondayOfCurrentWeek.setDate(now.getDate() + diffToMonday);
     mondayOfCurrentWeek.setHours(0, 0, 0, 0);
 
-    const weeksToScrape = 2; 
-    for (let i = 0; i < weeksToScrape; i++) {
-      const start = new Date(mondayOfCurrentWeek);
-      start.setDate(mondayOfCurrentWeek.getDate() + (i * 7));
-      
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
+    const weeksToScrape = 2;
 
-      const dateRange = {
-        start: start.toISOString().split('T')[0],
-        end: end.toISOString().split('T')[0]
-      };
+    for (const content of scrapedResults) {
+      if (!content.text.trim()) continue;
 
-      this.logger.log(`Processing chunk ${i + 1}/${weeksToScrape}: ${dateRange.start} to ${dateRange.end} for ${region} (Week starting Monday)`);
-      this.logger.log(`Sending ${rawText.length} characters of raw text to AI Normalizer...`);
-      const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(rawText, region, dateRange);
-      
-      if (structuredData && structuredData.length > 0) {
-        this.logger.log(`AI Normalizer returned ${structuredData.length} pharmacy records for ${region}.`);
-        await this.saveNormalizedPharmaciesBatch(structuredData);
-      } else {
-        this.logger.warn(`No data found/extracted by AI for range ${dateRange.start} - ${dateRange.end} in ${region}`);
+      for (let i = 0; i < weeksToScrape; i++) {
+        const start = new Date(mondayOfCurrentWeek);
+        start.setDate(mondayOfCurrentWeek.getDate() + (i * 7));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        const dateRange = {
+          start: start.toISOString().split('T')[0],
+          end: end.toISOString().split('T')[0]
+        };
+
+        this.logger.log(`[Handler] Processing ${region} content block (Inferred City: ${content.inferredCity || 'Unknown'}) for range ${dateRange.start} - ${dateRange.end}`);
+        
+        const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(
+          content.text, 
+          region, 
+          dateRange, 
+          content.inferredCity
+        );
+        
+        if (structuredData && structuredData.length > 0) {
+          this.logger.log(`[Handler] AI extracted ${structuredData.length} records for ${content.inferredCity || region}.`);
+          await this.saveNormalizedPharmaciesBatch(structuredData);
+        }
       }
     }
   }

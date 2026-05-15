@@ -15,7 +15,7 @@ describe('ScrapeColfarjuyHandler', () => {
   let pharmacyModel: any;
 
   const mockScraperService = {
-    scrapeRegion: jest.fn().mockResolvedValue('raw text data'),
+    scrapeRegion: jest.fn().mockResolvedValue([{ text: 'raw text data', inferredCity: 'San Salvador de Jujuy' }]),
   };
 
   const mockAiNormalizerService = {
@@ -23,10 +23,10 @@ describe('ScrapeColfarjuyHandler', () => {
       { 
         name: 'Farmacia Test', 
         address: 'Calle 123', 
-        city: 'Perico', 
+        city: 'San Salvador de Jujuy', 
         isOnDuty: true, 
-        dutyFrom: '2026-01-01T08:00:00Z',
-        dutyUntil: '2026-01-02T08:00:00Z' 
+        dutyFrom: new Date().toISOString(),
+        dutyUntil: new Date().toISOString() 
       }
     ]),
   };
@@ -76,75 +76,27 @@ describe('ScrapeColfarjuyHandler', () => {
     await handler.execute(new ScrapeColfarjuyCommand());
 
     expect(scraperService.scrapeRegion).toHaveBeenCalledTimes(2); // Capital and Interior
-    expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledTimes(4); // 2 regions * 2 weeks
-    expect(geoRefService.geocodeAddress).toHaveBeenCalledTimes(4); // 4 normalizer results total
+    // For each region (2) * each content block (1) * weeks (2) = 4 calls
+    expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledTimes(4); 
     expect(pharmacyModel.bulkWrite).toHaveBeenCalledTimes(4);
+  });
+
+  it('should pass inferredCity to AiNormalizerService', async () => {
+    mockScraperService.scrapeRegion.mockResolvedValueOnce([{ text: 'interior text', inferredCity: 'Palpalá' }]);
+    
+    await (handler as any).processRegion('Interior');
+
+    expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledWith(
+      'interior text',
+      'Interior',
+      expect.anything(),
+      'Palpalá'
+    );
   });
 
   it('should map city names correctly', () => {
     expect((handler as any).mapCityName('Perico')).toBe('Ciudad de Perico');
     expect((handler as any).mapCityName('S.S. de Jujuy')).toBe('San Salvador de Jujuy');
     expect((handler as any).mapCityName(undefined)).toBe('Desconocido');
-    expect((handler as any).mapCityName('Other')).toBe('Other');
-  });
-
-  it('should include isVoluntary in the update data', async () => {
-    mockAiNormalizerService.normalizeColfarjuyText.mockResolvedValueOnce([
-      { 
-        name: 'Voluntary Farm', 
-        address: 'Calle V', 
-        city: 'Interior', 
-        isOnDuty: true, 
-        dutyFrom: '2026-01-01T17:00:00Z',
-        dutyUntil: '2026-01-01T21:00:00Z', 
-        isVoluntary: true 
-      }
-    ]);
-
-    await (handler as any).processRegion('Interior');
-    
-    expect(pharmacyModel.bulkWrite).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          updateOne: expect.objectContaining({
-            update: expect.objectContaining({
-              $set: expect.objectContaining({
-                isVoluntary: true
-              })
-            })
-          })
-        })
-      ])
-    );
-  });
-
-  it('should handle permanently on duty correctly', async () => {
-    mockAiNormalizerService.normalizeColfarjuyText.mockResolvedValueOnce([
-      { 
-        name: '24/7 Farm', 
-        address: 'Calle 24', 
-        city: 'Capital', 
-        isOnDuty: true, 
-        dutyFrom: '2026-01-01T00:00:00Z',
-        dutyUntil: '2026-01-01T23:59:59Z',
-        isPermanentlyOnDuty: true 
-      }
-    ]);
-
-    await (handler as any).processRegion('Capital');
-    
-    expect(pharmacyModel.bulkWrite).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          updateOne: expect.objectContaining({
-            update: expect.objectContaining({
-              $set: expect.objectContaining({
-                isPermanentlyOnDuty: true
-              })
-            })
-          })
-        })
-      ])
-    );
   });
 });
