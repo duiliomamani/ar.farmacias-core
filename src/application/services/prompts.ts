@@ -27,7 +27,7 @@ REPETITION & EXPANSION RULES (MANDATORY):
    - Set isOnDuty: false.
    - Set isPermanentlyOnDuty: false.
 4. ATENCIÓN PERMANENTE (24hs):
-   - REPEAT: Generate ONE entry for EVERY day in the requested range.
+   - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
    - Hours: 00:00 ART to 23:59 ART.
    - Set isPermanentlyOnDuty: true.
    - Set isOnDuty: true.
@@ -80,7 +80,7 @@ DOCUMENT STRUCTURE & PARSING RULES:
 5. STANDARD SHIFTS (Daily Grid):
    - Starts at 08:00 AM ART and ends at 08:00 AM ART the NEXT day.
    - openingHours: "08:00 a 08:00 (Siguiente día)".
-   
+
 
 UTC CONVERSION (STRICT - Argentina is UTC-3):
 - 08:00 AM ART -> 11:00 AM UTC (same day).
