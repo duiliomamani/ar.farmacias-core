@@ -3,7 +3,10 @@ export const COLFARJUY_SYSTEM_PROMPT = `You are a Senior Data Extraction Enginee
 STRICT BUSINESS RULES FOR EXPANSION:
 The input text contains daily rotating shifts AND fixed lists (Listado B, Listado C, and Atención Permanente). You MUST expand the fixed lists for EVERY relevant day in the requested range.
     
-THOROUGHNESS RULE: Do NOT skip any pharmacy mentioned in the lists. Ensure every single entry from LISTADO B, LISTADO C, and PERMANENTE is expanded for the range.
+THOROUGHNESS RULE (CRITICAL): 
+- Do NOT skip any pharmacy mentioned. 
+- IMPORTANT: A single shift or date often has MULTIPLE pharmacies (e.g., 2 or 3 rows for the same day). You MUST extract EVERY pharmacy name found in those rows.
+- Ensure every single entry from LISTADO B, LISTADO C, and PERMANENTE is expanded for the range.
     
 REPETITION & EXPANSION RULES (MANDATORY):
 1. Main Grid (Daily Rotating): Map these pharmacies ONLY to their specific date in the grid.
@@ -28,7 +31,7 @@ REPETITION & EXPANSION RULES (MANDATORY):
    - Set isPermanentlyOnDuty: false.
 4. ATENCIÓN PERMANENTE (24hs):
    - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
-   - Set Opening hours: 24hs
+   - Hours: 00:00 ART to 23:59 ART.
    - Set isPermanentlyOnDuty: true.
    - Set isOnDuty: true.
    - Set isVoluntary: false.
@@ -73,7 +76,8 @@ MASTER LIST PARSING (CRITICAL):
    - Set isPermanentlyOnDuty: true.
    - Set openingHours: "Atención Permanente (Única farmacia en la localidad)".
 
-DOCUMENT RULES:
+DOCUMENT RULES & MULTI-PHARMACY HANDLING:
+- IMPORTANT: A single shift slot often contains TWO or more pharmacies. You MUST extract EVERY pharmacy listed. Do NOT stop after the first name in a row or date slot.
 - THE (*) MARKER: If a pharmacy name has an asterisk (*) next to it or in its row, generate an additional SATURDAY shift (17:00 to 21:00 ART) for EVERY Saturday in the range. Set isVoluntary: true.
 - STANDARD SHIFTS: 08:00 AM ART to 08:00 AM ART next day.
 - TURNOS VOLUNTARIOS SECTION: Explicitly marked pharmacies for specific weekend shifts. Set isVoluntary: true.

@@ -194,6 +194,9 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
       'SSJ': 'San Salvador de Jujuy',
       'Palpalá': 'Palpalá',
       'El Carmen': 'El Carmen',
+      'LGSM': 'Libertador Gral. San Martín',
+      'Libertador': 'Libertador Gral. San Martín',
+      'Ledesma': 'Libertador Gral. San Martín',
     };
     return mapping[city] || city;
   }
