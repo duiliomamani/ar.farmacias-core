@@ -51,13 +51,16 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
         ],
       };
     } else {
-      // If no date is provided, we look for pharmacies on duty RIGHT NOW
+      // If no date is provided, we look for pharmacies on duty in the next 24 hours
+      // This satisfies the "today until tomorrow" requirement.
       const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      
       queryDateFilter = {
         $or: [
           { isPermanentlyOnDuty: true },
           {
-            dutyFrom: { $lte: now },
+            dutyFrom: { $lte: tomorrow },
             dutyUntil: { $gte: now },
           },
         ],

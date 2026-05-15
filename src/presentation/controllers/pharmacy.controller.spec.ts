@@ -89,5 +89,20 @@ describe('PharmacyController', () => {
 
       expect(queryBus.execute).toHaveBeenCalled();
     });
+
+    it('should correctly parse DD-MM-YYYY format', async () => {
+      const dto = {
+        date: '15-05-2026',
+      };
+      mockQueryBus.execute.mockResolvedValue([]);
+
+      await controller.getByDate(dto);
+
+      expect(queryBus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          date: new Date('2026-05-15T00:00:00Z')
+        })
+      );
+    });
   });
 });

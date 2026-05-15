@@ -20,11 +20,9 @@ export class PharmacyController {
   @ApiResponse({ status: 200, description: 'List of pharmacies found', type: [Pharmacy] })
   async getNearby(@Query() dto: GetNearbyPharmaciesDto): Promise<ApiResponseDto<Pharmacy[]>> {
     const { lat, lng, radius, date } = dto;
-    const utcDate = date 
-      ? (date.includes('T') ? new Date(date) : new Date(`${date}T00:00:00Z`)) 
-      : undefined;
+    const parsedDate = this.parseDate(date);
     
-    const data = await this.queryBus.execute(new GetNearbyPharmaciesQuery(lat, lng, radius || 5000, utcDate));
+    const data = await this.queryBus.execute(new GetNearbyPharmaciesQuery(lat, lng, radius || 5000, parsedDate));
     return ApiRes.success(data);
   }
 
@@ -33,10 +31,29 @@ export class PharmacyController {
   @ApiResponse({ status: 200, description: 'List of pharmacies found', type: [Pharmacy] })
   async getByDate(@Query() dto: GetPharmaciesByDateDto): Promise<ApiResponseDto<Pharmacy[]>> {
     const { date, city } = dto;
-    // If date is YYYY-MM-DD, append T00:00:00Z to force UTC midnight and avoid local timezone shifts
-    const utcDate = date.includes('T') ? new Date(date) : new Date(`${date}T00:00:00Z`);
+    const parsedDate = this.parseDate(date) || new Date();
     
-    const data = await this.queryBus.execute(new GetPharmaciesByDateQuery(utcDate, city));
+    const data = await this.queryBus.execute(new GetPharmaciesByDateQuery(parsedDate, city));
     return ApiRes.success(data);
+  }
+
+  private parseDate(dateStr?: string): Date | undefined {
+    if (!dateStr) return undefined;
+
+    // Handle DD-MM-YYYY or DD/MM/YYYY
+    const ddmmyyyy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(dateStr);
+    if (ddmmyyyy) {
+      const [_, day, month, year] = ddmmyyyy;
+      return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00Z`);
+    }
+
+    // Handle YYYY-MM-DD
+    const yyyymmdd = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/.exec(dateStr);
+    if (yyyymmdd && !dateStr.includes('T')) {
+      return new Date(`${dateStr}T00:00:00Z`);
+    }
+
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? undefined : date;
   }
 }

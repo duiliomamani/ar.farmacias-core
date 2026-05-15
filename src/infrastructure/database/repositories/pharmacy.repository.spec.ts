@@ -102,6 +102,12 @@ describe('PharmacyRepository', () => {
       const result = await repository.findNearby(lat, lng, radius);
 
       expect(result).toHaveLength(1);
+      
+      const query = mockPharmacyModel.find.mock.calls[0][0];
+      const rangeFilter = query.$or.find((o: any) => o.dutyFrom);
+      // tomorrow should be around 24h from now
+      expect(rangeFilter.dutyFrom.$lte.getTime()).toBeGreaterThan(Date.now() + 23 * 3600 * 1000);
+      expect(rangeFilter.dutyUntil.$gte.getTime()).toBeLessThanOrEqual(Date.now());
     });
 
     it('should use day-overlap logic when a specific date is provided', async () => {

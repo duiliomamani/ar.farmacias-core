@@ -41,7 +41,7 @@ export class AiNormalizerService {
     const today = new Date().toISOString().split('T')[0];
     const rangeInstruction = dateRange
       ? `EXTRACT ONLY for the date range: from ${dateRange.start} to ${dateRange.end} inclusive.`
-      : `EXTRACT ALL pharmacies mentioned in the text for the current and future dates.`;
+      : `EXTRACT ALL pharmacies mentioned in the PDF.`;
 
     const cityContext = inferredCity
       ? `CITY CONTEXT: The provided text is specifically for the city of "${inferredCity}". Set the "city" field for all extracted pharmacies to this value unless the text explicitly states otherwise.`
