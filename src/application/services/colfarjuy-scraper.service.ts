@@ -175,7 +175,7 @@ export class ColfarjuyScraperService {
     const found = cities.find(city => text.toLowerCase().includes(city.toLowerCase()));
 
     if (found?.toLowerCase().includes('palpala')) return 'Palpalá';
-    if (found?.toLowerCase().includes('lgsm') || found?.toLowerCase().includes('ledesma')) return 'Libertador Gral. San Martín';
+    if (found?.toLowerCase().includes('lgsm') || found?.toLowerCase().includes('ledesma') || found?.toLowerCase().includes('libertador')) return 'Libertador Gral. San Martín';
 
 
     return found;
