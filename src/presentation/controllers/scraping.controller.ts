@@ -3,7 +3,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { ScrapeColfarjuyCommand } from '../../application/commands/scrape-colfarjuy.command';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
-import { ApiRes } from 'src/application/dtos/api-response.dto';
+import { ApiRes } from '../../application/dtos/api-response.dto';
 
 @ApiTags('scraping')
 @Controller('api/scraping')

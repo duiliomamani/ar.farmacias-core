@@ -9,6 +9,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'API is running successfully' })
   check() {
     return {
+      status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'ar.farmacias-core',
     };

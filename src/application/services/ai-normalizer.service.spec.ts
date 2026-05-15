@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AiNormalizerService } from './ai-normalizer.service';
+import { z } from 'zod';
 
 describe('AiNormalizerService', () => {
   let service: AiNormalizerService;
@@ -59,20 +60,60 @@ describe('AiNormalizerService', () => {
       );
     });
 
-    it('should include isVoluntary in the schema for Interior but not for Capital', async () => {
+    it('should include isVoluntary in the schema for both Capital and Interior', async () => {
       const callGeminiSpy = jest.spyOn(service as any, 'callGemini').mockResolvedValue([]);
       
       // Test for Capital
       await service.normalizeColfarjuyText('raw text', 'Capital');
       const capitalSchema = callGeminiSpy.mock.calls[0][1];
       const capitalItemSchema = (capitalSchema as any).element;
-      expect(capitalItemSchema.shape).not.toHaveProperty('isVoluntary');
+      expect(capitalItemSchema.shape).toHaveProperty('isVoluntary');
 
       // Test for Interior
       await service.normalizeColfarjuyText('raw text', 'Interior');
       const interiorSchema = callGeminiSpy.mock.calls[1][1];
       const interiorItemSchema = (interiorSchema as any).element;
       expect(interiorItemSchema.shape).toHaveProperty('isVoluntary');
+    });
+  });
+
+  describe('callGemini (Private Logic)', () => {
+    let mockGenerateContent: jest.Mock;
+
+    beforeEach(() => {
+      mockGenerateContent = jest.fn();
+      (service as any).genAI = {
+        models: {
+          generateContent: mockGenerateContent,
+        },
+      };
+    });
+
+    it('should handle empty result text from Gemini', async () => {
+      mockGenerateContent.mockResolvedValue({});
+      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      expect(result).toEqual([]);
+    });
+
+    it('should handle JSON parse errors from Gemini', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'invalid-json' });
+      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      expect(result).toEqual([]);
+    });
+
+    it('should handle double-encoded JSON string', async () => {
+      const validArray = [{ name: 'Test' }];
+      mockGenerateContent.mockResolvedValue({ text: JSON.stringify(JSON.stringify(validArray)) });
+      
+      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      
+      expect(result).toEqual(validArray);
+    });
+
+    it('should handle general errors and log them', async () => {
+      mockGenerateContent.mockRejectedValue(new Error('API Error'));
+      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      expect(result).toEqual([]);
     });
   });
 });

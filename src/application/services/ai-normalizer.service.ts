@@ -87,13 +87,7 @@ export class AiNormalizerService {
     }
 
     try {
-      let jsonSchema = (schema as any).toJSONSchema ? (schema as any).toJSONSchema() : zodToJsonSchema(schema as any);
-
-      // Strip $schema and other potentially unsupported top-level fields
-      if (jsonSchema && typeof jsonSchema === 'object') {
-        const { $schema, ...rest } = jsonSchema as any;
-        jsonSchema = rest;
-      }
+      let jsonSchema = zodToJsonSchema(schema as any);
 
       const result = await this.genAI.models.generateContent({
         model: 'gemini-3.1-flash-lite',
@@ -105,38 +99,37 @@ export class AiNormalizerService {
         }
       });
 
-      if (!result.text) {
+      const resultText = (result as any).text || '';
+
+      if (!resultText) {
         this.logger.error('No text returned from Gemini API');
         return [];
       }
 
-      this.logger.log(`Raw response from Gemini: ${result.text}`);
+      this.logger.log(`Raw response from Gemini: ${resultText}`);
 
       let json: any;
       try {
-        json = JSON.parse(result.text);
+        json = JSON.parse(resultText);
       } catch (e: any) {
         this.logger.error(`Failed to parse JSON response from Gemini: ${e.message}`);
-        this.logger.error(`First 200 chars: ${result.text.substring(0, 200)}`);
-        this.logger.error(`Last 200 chars: ${result.text.substring(result.text.length - 200)}`);
-        throw e;
+        return [];
       }
 
-      // If the response is double-encoded (a string containing JSON), parse it again
       if (typeof json === 'string') {
         this.logger.warn('Gemini returned a double-encoded JSON string. Parsing again...');
-        json = JSON.parse(json);
+        try {
+          json = JSON.parse(json);
+        } catch (e: any) {
+          this.logger.error(`Failed to parse double-encoded JSON: ${e.message}`);
+          return [];
+        }
       }
 
       this.logger.log('Parsed JSON:', json);
-
-      const parsedResult = schema.parse(json);
-      return parsedResult;
+      return schema.parse(json);
     } catch (error: any) {
       this.logger.error(`Error calling Gemini API: ${error.message}`);
-      if (error.stack) {
-        this.logger.error(error.stack);
-      }
       return [];
     }
   }

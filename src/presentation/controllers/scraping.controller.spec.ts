@@ -41,15 +41,16 @@ describe('ScrapingController', () => {
       mockConfigService.get.mockReturnValue('secret');
       mockCommandBus.execute.mockResolvedValue(undefined);
 
-      const result = await controller.triggerColfarjuyScraping({ 'authorization': 'Bearer secret' });
+      const result = await controller.triggerColfarjuyScraping({ 'x-auth-token': 'Bearer secret' });
 
       expect(commandBus.execute).toHaveBeenCalledWith(expect.any(ScrapeColfarjuyCommand));
-      expect(result).toEqual({ status: 'success', message: 'Scraping process initiated and completed' });
+      expect(result.isSuccessful).toBe(true);
+      expect(result.data).toEqual({ status: 'success', message: 'Scraping process initiated and completed' });
     });
 
     it('should throw UnauthorizedException with wrong secret', async () => {
       mockConfigService.get.mockReturnValue('secret');
-      await expect(controller.triggerColfarjuyScraping({ 'authorization': 'Bearer wrong' })).rejects.toThrow(UnauthorizedException);
+      await expect(controller.triggerColfarjuyScraping({ 'x-auth-token': 'Bearer wrong' })).rejects.toThrow(UnauthorizedException);
     });
 
     it('should handle scraping errors gracefully', async () => {
@@ -58,7 +59,8 @@ describe('ScrapingController', () => {
 
       const result = await controller.triggerColfarjuyScraping({ 'x-auth-token': 'Bearer secret' });
 
-      expect(result).toEqual({ status: 'error', message: 'Scrape failed' });
+      expect(result.isSuccessful).toBe(false);
+      expect(result.errors[0].message).toBe('Scrape failed');
     });
   });
 });

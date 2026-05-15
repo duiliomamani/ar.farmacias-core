@@ -99,4 +99,58 @@ describe('ScrapeColfarjuyHandler', () => {
     expect((handler as any).mapCityName('S.S. de Jujuy')).toBe('San Salvador de Jujuy');
     expect((handler as any).mapCityName(undefined)).toBe('Desconocido');
   });
+
+  describe('Edge Cases', () => {
+    it('should skip processing if scraper returns no results', async () => {
+      mockScraperService.scrapeRegion.mockResolvedValueOnce([]);
+      await (handler as any).processRegion('Capital');
+      expect(aiNormalizerService.normalizeColfarjuyText).not.toHaveBeenCalled();
+    });
+
+    it('should skip pharmacy if duty dates are missing', async () => {
+      // We test saveNormalizedPharmaciesBatch directly to verify skipping logic
+      const result = await (handler as any).saveNormalizedPharmaciesBatch([{ name: 'No Dates' }]);
+      expect(pharmacyModel.bulkWrite).not.toHaveBeenCalled();
+    });
+
+    it('should skip pharmacy if dates are invalid', async () => {
+      const result = await (handler as any).saveNormalizedPharmaciesBatch([{ 
+        name: 'Invalid Date', 
+        dutyFrom: 'abc', 
+        dutyUntil: 'def' 
+      }]);
+      expect(pharmacyModel.bulkWrite).not.toHaveBeenCalled();
+    });
+
+    it('should handle geocoding failure gracefully (unset location)', async () => {
+      mockAiNormalizerService.normalizeColfarjuyText.mockResolvedValueOnce([{ 
+        name: 'Geo Fail', 
+        address: 'X', 
+        city: 'Y', 
+        dutyFrom: new Date().toISOString(), 
+        dutyUntil: new Date().toISOString() 
+      }]);
+      mockGeoRefService.geocodeAddress.mockResolvedValueOnce(null);
+
+      await (handler as any).processRegion('Capital');
+
+      expect(pharmacyModel.bulkWrite).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            updateOne: expect.objectContaining({
+              update: expect.objectContaining({
+                $unset: { location: "" }
+              })
+            })
+          })
+        ])
+      );
+    });
+
+    it('should log when bulkWrite has no operations', async () => {
+      mockAiNormalizerService.normalizeColfarjuyText.mockResolvedValueOnce([]);
+      await (handler as any).saveNormalizedPharmaciesBatch([]);
+      expect(pharmacyModel.bulkWrite).not.toHaveBeenCalled();
+    });
+  });
 });
