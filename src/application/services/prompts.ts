@@ -16,27 +16,27 @@ THOROUGHNESS RULE (CRITICAL):
 REPETITION & EXPANSION RULES (MANDATORY):
 1. Main Grid (Daily Rotating): Map these pharmacies ONLY to their specific date in the grid.
    - Look for "FARMACIAS DE TURNO".
-   - Hours: 08:00 ART to 08:00 ART (next day).
+   - OpeningHours: 08:00 ART to 08:00 ART (next day).
    - Set isOnDuty: true.
    - Set isVoluntary: false.
    - Set isPermanentlyOnDuty: false.
 2. LISTADO B (Turno Voluntario Extendido - FTVE):
    - Look for "LISTADO B" or "FTVE".
    - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
-   - Hours: 08:00 ART to 24:00 ART.
+   - OpeningHours Hours: 08:00 ART to 24:00 ART.
    - Set isVoluntary: true.
    - Set isOnDuty: false.
    - Set isPermanentlyOnDuty: false.
 3. LISTADO C (Turno Voluntario Extendido - FTVE + Domingos):
    - Look for "LISTADO C".
    - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
-   - Mon-Sat: 08:00 ART to 24:00 ART. Sunday: 08:00 ART to 08:00 ART (next day).
+   - OpeningHours Mon-Sat: 08:00 ART to 24:00 ART. Sunday: 08:00 ART to 08:00 ART (next day).
    - Set isVoluntary: true.
    - Set isOnDuty: false.
    - Set isPermanentlyOnDuty: false.
 4. ATENCIÓN PERMANENTE (24hs):
    - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
-   - Hours: 00:00 ART to 23:59 ART.
+   - OpeningHours: 00:00 ART to 23:59 ART.
    - Set isPermanentlyOnDuty: true.
    - Set isOnDuty: true.
    - Set isVoluntary: false.
