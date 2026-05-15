@@ -50,26 +50,34 @@ export class GeoRefService {
   }
 
   async geocodeAddress(address: string, city: string = 'San Salvador de Jujuy', name?: string): Promise<GeoRefResponse | null> {
-    this.logger.log(`[Geocoding Pipeline] Started for: "${name ? name + ' - ' : ''}${address}", city: "${city}"`);
+    let enhancedAddress = address;
+    if (name) {
+      const pharmacyPrefix = name.toLowerCase().includes('farmacia') ? '' : 'Farmacia ';
+      if (!address.toLowerCase().includes(name.toLowerCase())) {
+        enhancedAddress = `${pharmacyPrefix}${name}, ${address}`;
+      }
+    }
+
+    this.logger.log(`[Geocoding Pipeline] Started for: "${enhancedAddress}", city: "${city}"`);
 
     // Strategy 1: Google Maps (High Precision - Needs API Key)
-    const googleResult = await this.tryGoogleMaps(address, city, name);
+    const googleResult = await this.tryGoogleMaps(enhancedAddress, city);
     if (googleResult) return googleResult;
 
     // Strategy 2: Nominatim (OpenStreetMap) Fallback
-    const nominatimResult = await this.tryNominatim(address, city, name);
+    const nominatimResult = await this.tryNominatim(enhancedAddress, city);
     if (nominatimResult) return nominatimResult;
 
-    this.logger.warn(`[Geocoding Pipeline] ❌ ALL strategies failed for: "${name ? name + ' - ' : ''}${address}", city: "${city}"`);
+    this.logger.warn(`[Geocoding Pipeline] ❌ ALL strategies failed for: "${enhancedAddress}", city: "${city}"`);
     return null;
   }
 
-  private async tryGoogleMaps(address: string, city: string, name?: string): Promise<GeoRefResponse | null> {
+  private async tryGoogleMaps(address: string, city: string): Promise<GeoRefResponse | null> {
     const apiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
     if (!apiKey) return null;
 
     try {
-      const fullQuery = name ? `${name}, ${address}, ${city}, Jujuy, Argentina` : `${address}, ${city}, Jujuy, Argentina`;
+      const fullQuery = `${address}, ${city}, Jujuy, Argentina`;
       this.logger.debug(`[Google Maps API] Requesting geocoding for: ${fullQuery}...`);
       const response = await axios.get(`${this.googleMapsUrl}/api/geocode/json`, {
         params: {
@@ -80,7 +88,7 @@ export class GeoRefService {
 
       if (response.data.status === 'OK') {
         const result = response.data.results[0];
-        this.logger.debug(`Google Maps success for ${name || address}`);
+        this.logger.debug(`Google Maps success for ${address}`);
         const lat = result.geometry.location.lat;
         const lng = result.geometry.location.lng;
 
@@ -102,9 +110,9 @@ export class GeoRefService {
   }
 
 
-  private async tryNominatim(address: string, city: string, name?: string): Promise<GeoRefResponse | null> {
+  private async tryNominatim(address: string, city: string): Promise<GeoRefResponse | null> {
     try {
-      const fullQuery = name ? `${name}, ${address}, ${city}, Jujuy, Argentina` : `${address}, ${city}, Jujuy, Argentina`;
+      const fullQuery = `${address}, ${city}, Jujuy, Argentina`;
       this.logger.debug(`[Nominatim API] Requesting geocoding for: ${fullQuery}...`);
       // Nominatim requires a User-Agent and recommends a delay between requests
       const response = await axios.get(this.nominatimUrl, {
@@ -121,7 +129,7 @@ export class GeoRefService {
 
       if (response.data && response.data.length > 0) {
         const result = response.data[0];
-        this.logger.debug(`Nominatim success for ${name || address}`);
+        this.logger.debug(`Nominatim success for ${address}`);
         const lat = parseFloat(result.lat);
         const lng = parseFloat(result.lon);
 

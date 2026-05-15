@@ -159,5 +159,69 @@ describe('GeoRefService', () => {
       const result = await service.geocodeAddress('Calle 789');
       expect(result).toBeNull();
     });
+
+    it('should prepend pharmacy name to address if not present', async () => {
+      mockConfigService.get.mockReturnValue('fake-google-key');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          status: 'OK',
+          results: [
+            {
+              geometry: {
+                location: { lat: -24.15, lng: -65.15 },
+              },
+            },
+          ],
+        },
+      });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          ubicacion: {
+            lat: -24.15,
+            lon: -65.15,
+            provincia_id: '38',
+          },
+        },
+      });
+
+      await service.geocodeAddress('Belgrano 100', 'S.S. de Jujuy', 'San Martin');
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.stringContaining('maps/api/geocode/json'),
+        expect.objectContaining({
+          params: expect.objectContaining({
+            address: 'Farmacia San Martin, Belgrano 100, S.S. de Jujuy, Jujuy, Argentina',
+          }),
+        })
+      );
+    });
+
+    it('should not prepend pharmacy name if already in address', async () => {
+      mockConfigService.get.mockReturnValue('fake-google-key');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          status: 'OK',
+          results: [
+            {
+              geometry: {
+                location: { lat: -24.15, lng: -65.15 },
+              },
+            },
+          ],
+        },
+      });
+      mockedAxios.get.mockResolvedValueOnce({ data: { ubicacion: {} } });
+
+      await service.geocodeAddress('Farmacia San Martin, Belgrano 100', 'S.S. de Jujuy', 'San Martin');
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.stringContaining('maps/api/geocode/json'),
+        expect.objectContaining({
+          params: expect.objectContaining({
+            address: 'Farmacia San Martin, Belgrano 100, S.S. de Jujuy, Jujuy, Argentina',
+          }),
+        })
+      );
+    });
   });
 });
