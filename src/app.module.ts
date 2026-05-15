@@ -19,7 +19,7 @@ import { HealthController } from './presentation/controllers/health.controller';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI') || 'mongodb://localhost:27017/farmaya',
+        uri: configService.get<string>('MONGODB_URI')
       }),
       inject: [ConfigService],
     }),
@@ -34,4 +34,4 @@ import { HealthController } from './presentation/controllers/health.controller';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

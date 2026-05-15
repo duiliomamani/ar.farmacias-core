@@ -53,3 +53,7 @@ export class PharmacyReport {
 }
 
 export const PharmacyReportSchema = SchemaFactory.createForClass(PharmacyReport);
+
+// Add TTL index to automatically delete reports after 3 days
+// Community reports are transient; this keeps the database within free tier limits
+PharmacyReportSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 3 });

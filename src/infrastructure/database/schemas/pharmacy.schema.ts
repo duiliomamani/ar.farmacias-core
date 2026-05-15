@@ -77,3 +77,7 @@ export const PharmacySchema = SchemaFactory.createForClass(Pharmacy);
 
 // Add sparse 2dsphere index for geospatial queries
 PharmacySchema.index({ location: '2dsphere' }, { sparse: true });
+
+// Add TTL index to automatically delete old pharmacy shifts 15 days after duty expires
+// This keeps the database lean and stays within the free tier limits
+PharmacySchema.index({ dutyUntil: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 15 });
