@@ -5,7 +5,8 @@ import * as pdf from 'pdf-parse';
 import { chromium, Browser } from 'playwright-core';
 
 export interface ScrapedContent {
-  text: string;
+  text?: string;
+  pdfBuffer?: Buffer;
   source?: string;
   inferredCity?: string;
 }
@@ -98,9 +99,16 @@ export class ColfarjuyScraperService {
     // Check for PDFs in Capital just in case
     const pdfLinks = this.extractPdfLinks($);
     if (pdfLinks.length > 0) {
-      for (const pdf of pdfLinks) {
-        const text = await this.downloadAndParsePdf(pdf.url);
-        if (text) results.push({ text, source: pdf.url, inferredCity: 'San Salvador de Jujuy' });
+      for (const pdfItem of pdfLinks) {
+        const { buffer, text } = await this.downloadAndParsePdf(pdfItem.url);
+        if (buffer) {
+          results.push({ 
+            pdfBuffer: buffer, 
+            text: text || '', 
+            source: pdfItem.url, 
+            inferredCity: 'San Salvador de Jujuy' 
+          });
+        }
       }
     }
 
@@ -119,13 +127,14 @@ export class ColfarjuyScraperService {
     const results: ScrapedContent[] = [];
     const pdfLinks = this.extractPdfLinks($);
 
-    for (const pdf of pdfLinks) {
-      const text = await this.downloadAndParsePdf(pdf.url);
-      if (text) {
-        const inferredCity = this.inferCityFromText(pdf.linkText);
+    for (const pdfItem of pdfLinks) {
+      const { buffer, text } = await this.downloadAndParsePdf(pdfItem.url);
+      if (buffer) {
+        const inferredCity = this.inferCityFromText(pdfItem.linkText);
         results.push({
-          text,
-          source: pdf.url,
+          pdfBuffer: buffer,
+          text: text || '',
+          source: pdfItem.url,
           inferredCity
         });
       }
@@ -181,7 +190,7 @@ export class ColfarjuyScraperService {
     return found;
   }
 
-  private async downloadAndParsePdf(pdfUrl: string): Promise<string> {
+  private async downloadAndParsePdf(pdfUrl: string): Promise<{ buffer: Buffer | null, text: string }> {
     try {
       this.logger.log(`[PDF Parser] Downloading PDF: ${pdfUrl}`);
       const response = await axios.get(pdfUrl, {
@@ -189,12 +198,21 @@ export class ColfarjuyScraperService {
         headers: this.COMMON_HEADERS
       });
 
-      const pdfParser = (pdf as any).default || pdf;
-      const data = await pdfParser(Buffer.from(response.data));
-      return data.text;
+      const buffer = Buffer.from(response.data);
+      let text = '';
+      
+      try {
+        const pdfParser = (pdf as any).default || pdf;
+        const data = await pdfParser(buffer);
+        text = data.text;
+      } catch (parseError: any) {
+        this.logger.warn(`[PDF Parser] Could not parse text from PDF: ${parseError.message}`);
+      }
+
+      return { buffer, text };
     } catch (error: any) {
-      this.logger.error(`[PDF Parser] Failed to parse ${pdfUrl}: ${error.message}`);
-      return '';
+      this.logger.error(`[PDF Parser] Failed to download or parse ${pdfUrl}: ${error.message}`);
+      return { buffer: null, text: '' };
     }
   }
 }

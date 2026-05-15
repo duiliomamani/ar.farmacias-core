@@ -80,7 +80,8 @@ describe('ColfarjuyScraperService', () => {
     it('should handle PDF links in Interior correctly', async () => {
       const html = '<a href="/turnos-palpala.pdf">Turnos Palpalá</a>';
       mockPage.content.mockResolvedValue(html);
-      mockedAxios.get.mockResolvedValueOnce({ data: Buffer.from('pdf content'), status: 200 });
+      const pdfBuffer = Buffer.from('pdf content');
+      mockedAxios.get.mockResolvedValueOnce({ data: pdfBuffer, status: 200 });
       
       const pdfParser = (pdf as any).default || pdf;
       (pdfParser as jest.Mock).mockResolvedValue({ text: 'text from palpala pdf' });
@@ -88,6 +89,7 @@ describe('ColfarjuyScraperService', () => {
       const result = await service.scrapeRegion('Interior');
 
       expect(result).toHaveLength(1);
+      expect(result[0].pdfBuffer).toEqual(pdfBuffer);
       expect(result[0].text).toBe('text from palpala pdf');
       expect(result[0].inferredCity).toBe('Palpalá');
     });

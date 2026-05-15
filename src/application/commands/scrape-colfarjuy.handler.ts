@@ -51,7 +51,10 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
     const weeksToScrape = 2;
 
     for (const content of scrapedResults) {
-      if (!content.text.trim()) continue;
+      if (!content.pdfBuffer) {
+        this.logger.warn(`[Handler] Skipping content block for ${content.inferredCity || region} because no PDF buffer is available.`);
+        continue;
+      }
 
       for (let i = 0; i < weeksToScrape; i++) {
         const start = new Date(mondayOfCurrentWeek);
@@ -64,13 +67,13 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
           end: end.toISOString().split('T')[0]
         };
 
-        this.logger.log(`[Handler] Processing ${region} content block (Inferred City: ${content.inferredCity || 'Unknown'}) for range ${dateRange.start} - ${dateRange.end}`);
+        this.logger.log(`[Handler] Processing ${region} PDF block (Inferred City: ${content.inferredCity || 'Unknown'}) for range ${dateRange.start} - ${dateRange.end}`);
         
         const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(
-          content.text, 
           region, 
           dateRange, 
-          content.inferredCity
+          content.inferredCity,
+          content.pdfBuffer
         );
         
         if (structuredData && structuredData.length > 0) {

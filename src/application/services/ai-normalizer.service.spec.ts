@@ -44,7 +44,12 @@ describe('AiNormalizerService', () => {
       }).compile();
       const localService = localModule.get<AiNormalizerService>(AiNormalizerService);
       
-      const result = await localService.normalizeColfarjuyText('raw text', 'Capital');
+      const result = await localService.normalizeColfarjuyText('Capital', undefined, undefined, Buffer.from('pdf'));
+      expect(result).toEqual([]);
+    });
+
+    it('should return an empty array if no PDF buffer is provided', async () => {
+      const result = await service.normalizeColfarjuyText('Capital');
       expect(result).toEqual([]);
     });
 
@@ -52,25 +57,28 @@ describe('AiNormalizerService', () => {
       const callGeminiSpy = jest.spyOn(service as any, 'callGemini').mockResolvedValue([]);
       
       const dateRange = { start: '2026-06-01', end: '2026-06-07' };
-      await service.normalizeColfarjuyText('raw text', 'Capital', dateRange);
+      const pdfBuffer = Buffer.from('pdf');
+      await service.normalizeColfarjuyText('Capital', dateRange, undefined, pdfBuffer);
 
       expect(callGeminiSpy).toHaveBeenCalledWith(
         expect.stringContaining('EXTRACT ONLY for the date range: from 2026-06-01 to 2026-06-07 inclusive.'),
-        expect.anything()
+        expect.anything(),
+        pdfBuffer
       );
     });
 
     it('should include isVoluntary in the schema for both Capital and Interior', async () => {
       const callGeminiSpy = jest.spyOn(service as any, 'callGemini').mockResolvedValue([]);
-      
+      const pdfBuffer = Buffer.from('pdf');
+
       // Test for Capital
-      await service.normalizeColfarjuyText('raw text', 'Capital');
+      await service.normalizeColfarjuyText('Capital', undefined, undefined, pdfBuffer);
       const capitalSchema = callGeminiSpy.mock.calls[0][1];
       const capitalItemSchema = (capitalSchema as any).element;
       expect(capitalItemSchema.shape).toHaveProperty('isVoluntary');
 
       // Test for Interior
-      await service.normalizeColfarjuyText('raw text', 'Interior');
+      await service.normalizeColfarjuyText('Interior', undefined, undefined, pdfBuffer);
       const interiorSchema = callGeminiSpy.mock.calls[1][1];
       const interiorItemSchema = (interiorSchema as any).element;
       expect(interiorItemSchema.shape).toHaveProperty('isVoluntary');
@@ -91,13 +99,13 @@ describe('AiNormalizerService', () => {
 
     it('should handle empty result text from Gemini', async () => {
       mockGenerateContent.mockResolvedValue({});
-      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      const result = await (service as any).callGemini('prompt', z.array(z.any()), Buffer.from('pdf'));
       expect(result).toEqual([]);
     });
 
     it('should handle JSON parse errors from Gemini', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'invalid-json' });
-      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      const result = await (service as any).callGemini('prompt', z.array(z.any()), Buffer.from('pdf'));
       expect(result).toEqual([]);
     });
 
@@ -105,15 +113,34 @@ describe('AiNormalizerService', () => {
       const validArray = [{ name: 'Test' }];
       mockGenerateContent.mockResolvedValue({ text: JSON.stringify(JSON.stringify(validArray)) });
       
-      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      const result = await (service as any).callGemini('prompt', z.array(z.any()), Buffer.from('pdf'));
       
       expect(result).toEqual(validArray);
     });
 
     it('should handle general errors and log them', async () => {
       mockGenerateContent.mockRejectedValue(new Error('API Error'));
-      const result = await (service as any).callGemini('prompt', z.array(z.any()));
+      const result = await (service as any).callGemini('prompt', z.array(z.any()), Buffer.from('pdf'));
       expect(result).toEqual([]);
+    });
+
+    it('should send PDF as inlineData in contents', async () => {
+      mockGenerateContent.mockResolvedValue({ text: '[]' });
+      const pdfBuffer = Buffer.from('test-pdf');
+      await (service as any).callGemini('prompt', z.array(z.any()), pdfBuffer);
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              inlineData: {
+                data: pdfBuffer.toString('base64'),
+                mimeType: 'application/pdf'
+              }
+            })
+          ])
+        })
+      );
     });
   });
 });

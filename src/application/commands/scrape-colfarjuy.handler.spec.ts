@@ -15,7 +15,7 @@ describe('ScrapeColfarjuyHandler', () => {
   let pharmacyModel: any;
 
   const mockScraperService = {
-    scrapeRegion: jest.fn().mockResolvedValue([{ text: 'raw text data', inferredCity: 'San Salvador de Jujuy' }]),
+    scrapeRegion: jest.fn().mockResolvedValue([{ pdfBuffer: Buffer.from('pdf'), text: 'raw text data', inferredCity: 'San Salvador de Jujuy' }]),
   };
 
   const mockAiNormalizerService = {
@@ -81,16 +81,17 @@ describe('ScrapeColfarjuyHandler', () => {
     expect(pharmacyModel.bulkWrite).toHaveBeenCalledTimes(4);
   });
 
-  it('should pass inferredCity to AiNormalizerService', async () => {
-    mockScraperService.scrapeRegion.mockResolvedValueOnce([{ text: 'interior text', inferredCity: 'Palpalá' }]);
+  it('should pass pdfBuffer to AiNormalizerService', async () => {
+    const pdfBuffer = Buffer.from('interior-pdf');
+    mockScraperService.scrapeRegion.mockResolvedValueOnce([{ pdfBuffer, text: 'interior text', inferredCity: 'Palpalá' }]);
     
     await (handler as any).processRegion('Interior');
 
     expect(aiNormalizerService.normalizeColfarjuyText).toHaveBeenCalledWith(
-      'interior text',
       'Interior',
       expect.anything(),
-      'Palpalá'
+      'Palpalá',
+      pdfBuffer
     );
   });
 
@@ -123,6 +124,8 @@ describe('ScrapeColfarjuyHandler', () => {
     });
 
     it('should handle geocoding failure gracefully (unset location)', async () => {
+      const pdfBuffer = Buffer.from('pdf');
+      mockScraperService.scrapeRegion.mockResolvedValueOnce([{ pdfBuffer, text: 'text', inferredCity: 'Capital' }]);
       mockAiNormalizerService.normalizeColfarjuyText.mockResolvedValueOnce([{ 
         name: 'Geo Fail', 
         address: 'X', 

@@ -33,10 +33,10 @@ export class AiNormalizerService {
 
 
   async normalizeColfarjuyText(
-    rawText: string,
     region: 'Capital' | 'Interior',
     dateRange?: { start: string, end: string },
-    inferredCity?: string
+    inferredCity?: string,
+    pdfBuffer?: Buffer
   ): Promise<NormalizedPharmacy[]> {
     const today = new Date().toISOString().split('T')[0];
     const rangeInstruction = dateRange
@@ -54,11 +54,14 @@ export class AiNormalizerService {
     ADDITIONAL DYNAMIC CONTEXT:
     Today's date is ${today}.
     ${rangeInstruction}
-    ${cityContext}
-    
-    Text: "${rawText}"`;
+    ${cityContext}`;
 
-    this.logger.log(`Normalizing Colfarjuy ${region} text via Gemini (Range: ${dateRange?.start || 'ALL'} - ${dateRange?.end || 'ALL'})...`);
+    if (!pdfBuffer) {
+      this.logger.warn(`No PDF buffer provided for ${region} normalization. Skipping AI call.`);
+      return [];
+    }
+
+    this.logger.log(`Normalizing Colfarjuy ${region} PDF via Gemini (Range: ${dateRange?.start || 'ALL'} - ${dateRange?.end || 'ALL'})...`);
 
     const schemaFields: any = {
       name: z.string().describe("The name of the pharmacy."),
@@ -76,11 +79,11 @@ export class AiNormalizerService {
 
     const pharmacySchema = z.array(pharmacyItemSchema);
 
-    return this.callGemini(fullPrompt, pharmacySchema);
+    return this.callGemini(fullPrompt, pharmacySchema, pdfBuffer);
   }
 
 
-  private async callGemini(prompt: string, schema: z.ZodSchema<any>): Promise<any[]> {
+  private async callGemini(prompt: string, schema: z.ZodSchema<any>, pdfBuffer: Buffer): Promise<any[]> {
     if (!this.genAI) {
       this.logger.error('Gemini API Key is missing. Returning empty array.');
       return [];
@@ -89,9 +92,20 @@ export class AiNormalizerService {
     try {
       let jsonSchema = zodToJsonSchema(schema as any);
 
+      // Relying exclusively on native PDF processing
+      const contents: any[] = [
+        {
+          inlineData: {
+            data: pdfBuffer.toString('base64'),
+            mimeType: 'application/pdf'
+          }
+        },
+        { text: prompt }
+      ];
+
       const result = await this.genAI.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
+        model: 'gemini-3.1-flash',
+        contents: contents as any,
         config: {
           responseMimeType: "application/json",
           responseJsonSchema: jsonSchema as any,
