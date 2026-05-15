@@ -108,7 +108,7 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
 
         // Geocoding is the bottleneck. We parallelize it within the chunk.
         this.logger.log(`Geocoding address for ${data.name} in ${mappedCity}: ${data.address}`);
-        const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity);
+        const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity, data.name);
         
         if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
           this.logger.log(`✅ Geocoded ${data.name} successfully at [${geo.lat}, ${geo.lng}]`);
