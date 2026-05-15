@@ -55,13 +55,14 @@ export class ColfarjuyScraperService {
       
       const page = await context.newPage();
       
+      // Navigate and wait for basic DOM load to avoid timeouts on slow assets or trackers
+      // We use 'domcontentloaded' and then a manual wait for Cloudflare
       this.logger.log(`[Scraper] Navigating to: ${url}`);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
       
-      // Navigate and wait for network to be idle (Cloudflare challenge usually finishes by then)
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-      
-      // Extra wait just in case Cloudflare is still thinking
-      await page.waitForTimeout(5000);
+      // Wait for a few seconds to allow Cloudflare challenge to resolve and scripts to run
+      this.logger.log(`[Scraper] DOM loaded. Waiting 10s for Cloudflare/scripts...`);
+      await page.waitForTimeout(10000);
 
       const html = await page.content();
       const $ = cheerio.load(html);
