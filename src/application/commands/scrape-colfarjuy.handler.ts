@@ -39,19 +39,29 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
       return;
     }
 
-    const weeksToScrape = 2; // Reduced to 2 weeks for faster updates
+    // Calculate the Monday of the current week (local time)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    
+    const mondayOfCurrentWeek = new Date(now);
+    mondayOfCurrentWeek.setDate(now.getDate() + diffToMonday);
+    mondayOfCurrentWeek.setHours(0, 0, 0, 0);
+
+    const weeksToScrape = 2; 
     for (let i = 0; i < weeksToScrape; i++) {
-      const start = new Date();
-      start.setUTCDate(start.getUTCDate() + (i * 7));
-      const end = new Date();
-      end.setUTCDate(end.getUTCDate() + ((i + 1) * 7) - 1);
+      const start = new Date(mondayOfCurrentWeek);
+      start.setDate(mondayOfCurrentWeek.getDate() + (i * 7));
+      
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
 
       const dateRange = {
         start: start.toISOString().split('T')[0],
         end: end.toISOString().split('T')[0]
       };
 
-      this.logger.log(`Processing chunk ${i + 1}/${weeksToScrape}: ${dateRange.start} to ${dateRange.end} for ${region}`);
+      this.logger.log(`Processing chunk ${i + 1}/${weeksToScrape}: ${dateRange.start} to ${dateRange.end} for ${region} (Week starting Monday)`);
       this.logger.log(`Sending ${rawText.length} characters of raw text to AI Normalizer...`);
       const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(rawText, region, dateRange);
       
