@@ -22,14 +22,14 @@ REPETITION & EXPANSION RULES (MANDATORY):
    - Set isPermanentlyOnDuty: false.
 2. LISTADO B (Turno Voluntario Extendido - FTVE):
    - Look for "LISTADO B" or "FTVE".
-   - REPEAT: Generate ONE entry for EACH day (Monday to Saturday) in the requested range.
+   - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
    - Hours: 08:00 ART to 24:00 ART.
    - Set isVoluntary: true.
    - Set isOnDuty: false.
    - Set isPermanentlyOnDuty: false.
 3. LISTADO C (Turno Voluntario Extendido - FTVE + Domingos):
    - Look for "LISTADO C".
-   - REPEAT: Generate ONE entry for EVERY day (Monday to Sunday) in the requested range.
+   - REPEAT: Generate ONE entry for range date example: dutyFrom and dutyUntil are the same as dateRange.start and dateRange.end inclusive.
    - Mon-Sat: 08:00 ART to 24:00 ART. Sunday: 08:00 ART to 08:00 ART (next day).
    - Set isVoluntary: true.
    - Set isOnDuty: false.
