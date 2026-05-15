@@ -56,31 +56,27 @@ OUTPUT STRUCTURE (STRICT JSON ARRAY):
 
 export const COLFARJUY_INTERIOR_PROMPT = `You are a Senior Data Extraction Engineer and an expert in OCR text parsing. Your objective is to analyze a raw text dump from the "Interior" pharmacy schedule PDF and return structured JSON.
 
-DOCUMENT STRUCTURE & PARSING RULES:
-1. MASTER LIST: Look for the header "FARMACIAS DE TURNO". This section contains a list of pharmacies with: [Name], [Responsible Person], [Address], and [Phone]. Extract and use this address for all occurrences of that pharmacy.
-2. SHIFT DISTRIBUTION: Following the master list, there is a distribution of shifts by day. Match the pharmacy name to the dates.
-   - Look for "FARMACIAS DE TURNO".
-   - Hours: 08:00 ART to 08:00 ART (next day).
-   - Set isOnDuty: true.
-   - Set isVoluntary: false.
-   - Set isPermanentlyOnDuty: false.
-3. THE (*) MARKER RULE:
-   - Pharmacies marked with an asterisk (*) in the list or grid have an additional SATURDAY shift.
-   - REPEAT: For EVERY SATURDAY within the requested range, generate an entry for these pharmacies.
-   - Hours: 17:00 ART to 21:00 ART.
-   - openingHours: "Turno Voluntario (*) (17:00 a 21:00)".
-   - Set isVoluntary: true.
-   - Set isOnDuty: false.
-   - Set isPermanentlyOnDuty: false.
-4. TURNOS VOLUNTARIOS SECTION:
-   - If you see a section labeled "TURNOS VOLUNTARIOS", generate entries for those pharmacies for the relevant days mentioned (usually Saturdays/Sundays).
-   - Set isVoluntary: true.
-   - Set isOnDuty: false.
-   - Set isPermanentlyOnDuty: false.
-5. STANDARD SHIFTS (Daily Grid):
-   - Starts at 08:00 AM ART and ends at 08:00 AM ART the NEXT day.
-   - openingHours: "08:00 a 08:00 (Siguiente día)".
+MASTER LIST PARSING (CRITICAL):
+1. HEADER: Look for "FARMACIAS DE TURNO".
+2. ROW STRUCTURE: Each logical row contains:
+   - [Optional (*)]: Marker for Saturday shifts.
+   - [Pharmacy Name]: Name of the entity.
+   - [Responsible]: Name of the pharmacist.
+   - [Phone/Address]: These two fields are OPTIONAL and can be SWAPPED.
+3. IDENTIFICATION RULE: 
+   - A string with mostly numbers is the PHONE.
+   - A string with street names/numbers (e.g., "Av.", "Calle", "N°") is the ADDRESS.
+   - You MUST anchor the correctly identified ADDRESS to the [Pharmacy Name] in that specific row. Do NOT use an address from a different row.
+4. EMPTY CELLS: Some rows might have empty fields. If the address is missing in a row, do NOT "steal" it from the next row. Use "Dirección no especificada".
+5. UNIQUE PHARMACY RULE: In localities like "Calilegua", "La Esperanza", "La Mendieta", or "Yuto", or if the document states "Única farmacia", treat these pharmacies as ATENCIÓN PERMANENTE (24hs).
+   - REPEAT for EVERY day in the range.
+   - Set isPermanentlyOnDuty: true.
+   - Set openingHours: "Atención Permanente (Única farmacia en la localidad)".
 
+DOCUMENT RULES:
+- THE (*) MARKER: If a pharmacy name has an asterisk (*) next to it or in its row, generate an additional SATURDAY shift (17:00 to 21:00 ART) for EVERY Saturday in the range. Set isVoluntary: true.
+- STANDARD SHIFTS: 08:00 AM ART to 08:00 AM ART next day.
+- TURNOS VOLUNTARIOS SECTION: Explicitly marked pharmacies for specific weekend shifts. Set isVoluntary: true.
 
 UTC CONVERSION (STRICT - Argentina is UTC-3):
 - 08:00 AM ART -> 11:00 AM UTC (same day).
