@@ -90,7 +90,7 @@ export class AiNormalizerService {
       let jsonSchema = zodToJsonSchema(schema as any);
 
       const result = await this.genAI.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
