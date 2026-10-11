@@ -393,6 +393,18 @@ Telegram es opcional. Sin sus variables, el feedback se guarda en MongoDB y no s
 
 En producción, `TURNSTILE_HOSTNAMES` debe contener únicamente hostnames productivos; no debe incluir `localhost` ni `127.0.0.1`.
 
+Los valores no llevan protocolo, rutas ni puertos:
+
+```env
+# Desarrollo
+TURNSTILE_HOSTNAMES=localhost,127.0.0.1
+
+# Producción de ejemplo
+TURNSTILE_HOSTNAMES=farmaya.ar,www.farmaya.ar
+```
+
+Los mismos hostnames deben estar configurados en el widget de Turnstile dentro de Cloudflare.
+
 ## 9. Mapa, rutas y navegación
 
 ### Mapa
