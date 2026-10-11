@@ -15,8 +15,7 @@ export class GetPharmaciesByDateHandler implements IQueryHandler<GetPharmaciesBy
 
   async execute(query: GetPharmaciesByDateQuery): Promise<Pharmacy[]> {
     const { date, city } = query;
-    const result = await this.pharmacyRepository.findByDate(date, city);
-    this.scrapingRefreshService?.refreshIfStale(date);
-    return result;
+    await this.scrapingRefreshService?.refreshIfStale(date);
+    return this.pharmacyRepository.findByDate(date, city);
   }
 }

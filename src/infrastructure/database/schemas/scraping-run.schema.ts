@@ -14,6 +14,9 @@ export class ScrapingRun {
   @Prop({ required: true })
   startedAt!: Date;
 
+  @Prop({ default: 1 })
+  pipelineVersion!: number;
+
   // Internal token used to atomically claim the single active scraping run.
   @Prop({ select: false })
   lockToken?: string;

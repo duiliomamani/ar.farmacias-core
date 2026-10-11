@@ -74,8 +74,10 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
           $maxDistance: radiusInMeters,
         },
       },
-      isOnDuty: true,
-      ...queryDateFilter,
+      $and: [
+        { $or: [{ isOnDuty: true }, { isVoluntary: true }] },
+        queryDateFilter,
+      ],
     };
 
     const pharmacies = await this.model.find(query);
@@ -92,12 +94,16 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const query: any = {
-      isOnDuty: true,
-      $or: [
-        { isPermanentlyOnDuty: true },
+      $and: [
+        { $or: [{ isOnDuty: true }, { isVoluntary: true }] },
         {
-          dutyFrom: { $lte: endOfDay },
-          dutyUntil: { $gte: startOfDay },
+          $or: [
+            { isPermanentlyOnDuty: true },
+            {
+              dutyFrom: { $lte: endOfDay },
+              dutyUntil: { $gte: startOfDay },
+            },
+          ],
         },
       ],
     };

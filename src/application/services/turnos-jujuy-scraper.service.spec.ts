@@ -26,6 +26,7 @@ describe('TurnosJujuyScraperService', () => {
         longitude: -65.69734,
         dutyDate: '2026-10-11',
         isOnDuty: true,
+        isVoluntary: false,
       }),
     ]);
   });
@@ -48,6 +49,30 @@ describe('TurnosJujuyScraperService', () => {
         openingHours: 'Permanente',
         isOnDuty: true,
         isPermanentlyOnDuty: true,
+        isVoluntary: false,
+      }),
+    ]);
+  });
+
+  it('marks blue non-duty rows as voluntary', () => {
+    const service = new TurnosJujuyScraperService();
+    const html = `
+      <h4 class="titulo-principal">Farmacias de Turno hoy</h4>
+      <p>domingo, 11 de octubre de 2026</p>
+      <table><tbody>
+        <tr data-farmacia-id="476" class="item-farmacia-target">
+          <td>SAN SALVADOR DE JUJUY</td><td>MALL</td>
+          <td>AV. EL ÉXODO N°840 LOCAL N°1</td>
+          <td><span class="badge">de 8:00 a 24:00</span></td>
+        </tr>
+      </tbody></table>`;
+
+    expect(service.parse(html)).toEqual([
+      expect.objectContaining({
+        name: 'MALL',
+        isOnDuty: false,
+        isPermanentlyOnDuty: false,
+        isVoluntary: true,
       }),
     ]);
   });

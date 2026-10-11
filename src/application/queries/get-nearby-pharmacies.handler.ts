@@ -17,8 +17,7 @@ export class GetNearbyPharmaciesHandler implements IQueryHandler<GetNearbyPharma
   async execute(query: GetNearbyPharmaciesQuery): Promise<Pharmacy[]> {
     const { lat, lng, radius, date } = query;
     this.logger.log(`[GetNearbyPharmaciesHandler] Buscando farmacias cerca de ${lat}, ${lng} con radio ${radius} y fecha ${date?.toISOString() || 'NOW'}`);
-    const result = await this.pharmacyRepository.findNearby(lat, lng, radius, date);
-    this.scrapingRefreshService?.refreshIfStale(date);
-    return result;
+    await this.scrapingRefreshService?.refreshIfStale(date);
+    return this.pharmacyRepository.findNearby(lat, lng, radius, date);
   }
 }

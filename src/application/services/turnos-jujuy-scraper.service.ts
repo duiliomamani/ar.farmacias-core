@@ -14,6 +14,7 @@ export interface TurnosJujuyPharmacy {
   openingHours: string;
   isOnDuty: boolean;
   isPermanentlyOnDuty: boolean;
+  isVoluntary: boolean;
   dutyDate: string;
   source: string;
 }
@@ -91,8 +92,9 @@ export class TurnosJujuyScraperService {
     const openingHours = this.clean(cells.eq(3).text());
     const isPermanentlyOnDuty = /permanente/i.test(openingHours);
     const isOnDuty = isPermanentlyOnDuty || cells.eq(3).find('.badge-open').length > 0 || /de turno/i.test(openingHours);
+    const isVoluntary = !isOnDuty && !isPermanentlyOnDuty;
     const mapUrl = $(row).find('a[href*="google.com/maps"]').attr('href');
-    return this.buildItem($(row).attr('data-farmacia-id'), city, name, contact, openingHours, isOnDuty, mapUrl, points, dutyDate, source);
+    return this.buildItem($(row).attr('data-farmacia-id'), city, name, contact, openingHours, isOnDuty, isVoluntary, mapUrl, points, dutyDate, source);
   }
 
   private parseCard($: cheerio.CheerioAPI, card: Element, points: Map<string, any>, dutyDate: string, source: string) {
@@ -102,11 +104,12 @@ export class TurnosJujuyScraperService {
     const openingHours = this.clean($(card).find('.badge-open').text());
     const isPermanentlyOnDuty = /permanente/i.test(openingHours);
     const isOnDuty = isPermanentlyOnDuty || $(card).find('.badge-open').length > 0 || /de turno/i.test(openingHours);
+    const isVoluntary = !isOnDuty && !isPermanentlyOnDuty;
     const mapUrl = $(card).find('a[href*="google.com/maps"]').attr('href');
-    return this.buildItem($(card).attr('data-farmacia-id'), city, name, lines.join(' '), openingHours, isOnDuty, mapUrl, points, dutyDate, source);
+    return this.buildItem($(card).attr('data-farmacia-id'), city, name, lines.join(' '), openingHours, isOnDuty, isVoluntary, mapUrl, points, dutyDate, source);
   }
 
-  private buildItem(id: string | undefined, city: string, name: string, contact: string, openingHours: string, isOnDuty: boolean, mapUrl: string | undefined, points: Map<string, any>, dutyDate: string, source: string) {
+  private buildItem(id: string | undefined, city: string, name: string, contact: string, openingHours: string, isOnDuty: boolean, isVoluntary: boolean, mapUrl: string | undefined, points: Map<string, any>, dutyDate: string, source: string) {
     if (!name) return null;
     const point = id ? points.get(id) : undefined;
     const latitudeFromMapUrl = this.coordinateFromUrl(mapUrl, 0);
@@ -127,6 +130,7 @@ export class TurnosJujuyScraperService {
       openingHours,
       isOnDuty,
       isPermanentlyOnDuty,
+      isVoluntary,
       dutyDate,
       source,
     } satisfies TurnosJujuyPharmacy;

@@ -3,10 +3,12 @@ import { GetPharmaciesByDateHandler } from './get-pharmacies-by-date.handler';
 import { GetPharmaciesByDateQuery } from './get-pharmacies-by-date.query';
 import { IPharmacyRepository } from '../../domain/interfaces/pharmacy-system.interface';
 import { Pharmacy } from '../../domain/entities/pharmacy.entity';
+import { ScrapingRefreshService } from '../services/scraping-refresh.service';
 
 describe('GetPharmaciesByDateHandler', () => {
   let handler: GetPharmaciesByDateHandler;
   let pharmacyRepository: jest.Mocked<IPharmacyRepository>;
+  let scrapingRefreshService: { refreshIfStale: jest.Mock };
 
   beforeEach(async () => {
     pharmacyRepository = {
@@ -20,6 +22,7 @@ describe('GetPharmaciesByDateHandler', () => {
       findByDate: jest.fn(),
       findNearby: jest.fn(),
     };
+    scrapingRefreshService = { refreshIfStale: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +30,10 @@ describe('GetPharmaciesByDateHandler', () => {
         {
           provide: 'IPharmacyRepository',
           useValue: pharmacyRepository,
+        },
+        {
+          provide: ScrapingRefreshService,
+          useValue: scrapingRefreshService,
         },
       ],
     }).compile();
@@ -52,6 +59,9 @@ describe('GetPharmaciesByDateHandler', () => {
 
     expect(pharmacyRepository.findByDate).toHaveBeenCalledWith(testDate, 'San Salvador de Jujuy');
     expect(pharmacyRepository.findByDate).toHaveBeenCalledTimes(1);
+    expect(scrapingRefreshService.refreshIfStale).toHaveBeenCalledWith(testDate);
+    expect(scrapingRefreshService.refreshIfStale.mock.invocationCallOrder[0])
+      .toBeLessThan(pharmacyRepository.findByDate.mock.invocationCallOrder[0]);
     expect(result).toEqual(expectedResult);
   });
 

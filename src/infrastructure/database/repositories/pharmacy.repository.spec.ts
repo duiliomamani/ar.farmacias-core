@@ -104,7 +104,9 @@ describe('PharmacyRepository', () => {
       expect(result).toHaveLength(1);
       
       const query = mockPharmacyModel.find.mock.calls[0][0];
-      const rangeFilter = query.$or.find((o: any) => o.dutyFrom);
+      const statusFilter = query.$and[0];
+      const rangeFilter = query.$and[1].$or.find((o: any) => o.dutyFrom);
+      expect(statusFilter.$or).toEqual([{ isOnDuty: true }, { isVoluntary: true }]);
       // tomorrow should be around 24h from now
       expect(rangeFilter.dutyFrom.$lte.getTime()).toBeGreaterThan(Date.now() + 23 * 3600 * 1000);
       expect(rangeFilter.dutyUntil.$gte.getTime()).toBeLessThanOrEqual(Date.now());
@@ -123,7 +125,7 @@ describe('PharmacyRepository', () => {
       const query = mockPharmacyModel.find.mock.calls[mockPharmacyModel.find.mock.calls.length - 1][0];
       
       // The overlapping logic: dutyFrom <= endOfDay AND dutyUntil >= startOfDay
-      const rangeFilter = query.$or.find((o: any) => o.dutyFrom);
+      const rangeFilter = query.$and[1].$or.find((o: any) => o.dutyFrom);
       expect(rangeFilter.dutyFrom.$lte.getUTCHours()).toBe(23);
       expect(rangeFilter.dutyUntil.$gte.getUTCHours()).toBe(0);
     });
@@ -139,14 +141,18 @@ describe('PharmacyRepository', () => {
       const result = await repository.findByDate(date);
 
       expect(mockPharmacyModel.find).toHaveBeenCalledWith(expect.objectContaining({
-        isOnDuty: true,
-        $or: expect.arrayContaining([
-          { isPermanentlyOnDuty: true },
-          expect.objectContaining({
-            dutyFrom: { $lte: expect.any(Date) },
-            dutyUntil: { $gte: expect.any(Date) },
-          })
-        ]),
+        $and: [
+          { $or: [{ isOnDuty: true }, { isVoluntary: true }] },
+          {
+            $or: expect.arrayContaining([
+              { isPermanentlyOnDuty: true },
+              expect.objectContaining({
+                dutyFrom: { $lte: expect.any(Date) },
+                dutyUntil: { $gte: expect.any(Date) },
+              }),
+            ]),
+          },
+        ],
       }));
       expect(result).toHaveLength(1);
     });

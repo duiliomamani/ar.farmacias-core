@@ -10,6 +10,7 @@ import { TurnosJujuyPharmacy, TurnosJujuyScraperService } from '../services/turn
 import { randomUUID } from 'crypto';
 
 const TURNOS_SOURCE = 'turnosjujuy.com.ar';
+const SCRAPER_VERSION = 2;
 
 @CommandHandler(ScrapeTurnosJujuyCommand)
 export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJujuyCommand> {
@@ -48,7 +49,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     try {
       run = await this.scrapingRunModel.findOneAndUpdate(
         { source: TURNOS_SOURCE, status: 'running' },
-        { $setOnInsert: { source: TURNOS_SOURCE, status: 'running', startedAt, lockToken } },
+        { $setOnInsert: { source: TURNOS_SOURCE, status: 'running', startedAt, lockToken, pipelineVersion: SCRAPER_VERSION } },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       ).select('+lockToken').lean();
     } catch (error: any) {
@@ -101,6 +102,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
         dutyUntil: end.toISOString(),
         openingHours: item.openingHours,
         isPermanentlyOnDuty: item.isPermanentlyOnDuty,
+        isVoluntary: item.isVoluntary,
         source_type: 'TURNOS_JUJUY_HTML',
         raw_data: item,
         location: item.latitude && item.longitude
