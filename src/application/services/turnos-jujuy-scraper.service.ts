@@ -149,8 +149,18 @@ export class TurnosJujuyScraperService {
 
   private parseDate(value: string): string {
     const match = value.match(/(\d{1,2})[^\d]+(\d{1,2})[^\d]+(\d{4})/);
-    if (!match) return new Date().toISOString().slice(0, 10);
+    if (!match) return this.formatArgentinaDate(new Date());
     return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  }
+
+  private formatArgentinaDate(date: Date): string {
+    const values = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date).map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
   }
 
   private clean(value: string): string { return value.replace(/\s+/g, ' ').trim(); }

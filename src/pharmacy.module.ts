@@ -18,6 +18,7 @@ import { TurnosJujuyScraperService } from './application/services/turnos-jujuy-s
 import { ScrapingRun, ScrapingRunSchema } from './infrastructure/database/schemas/scraping-run.schema';
 import { Feedback, FeedbackSchema } from './infrastructure/database/schemas/feedback.schema';
 import { FeedbackController } from './presentation/controllers/feedback.controller';
+import { ScrapingRefreshService } from './application/services/scraping-refresh.service';
 
 const CommandHandlers = [ScrapeTurnosJujuyHandler];
 const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
@@ -41,6 +42,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     },
     GeoRefService,
     TurnosJujuyScraperService,
+    ScrapingRefreshService,
     GeoValidationService,
     ReputationService,
     ...CommandHandlers,

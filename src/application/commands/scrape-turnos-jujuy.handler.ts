@@ -7,6 +7,9 @@ import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schema
 import { ScrapingRun, ScrapingRunDocument } from '../../infrastructure/database/schemas/scraping-run.schema';
 import { Logger } from '@nestjs/common';
 import { TurnosJujuyPharmacy, TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
+import { randomUUID } from 'crypto';
+
+const TURNOS_SOURCE = 'turnosjujuy.com.ar';
 
 @CommandHandler(ScrapeTurnosJujuyCommand)
 export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJujuyCommand> {
@@ -32,7 +35,35 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
 
   private async processTurnosJujuy(): Promise<void> {
     const startedAt = new Date();
-    const run = await this.scrapingRunModel.create({ source: 'turnosjujuy.com.ar', status: 'running', startedAt });
+    const lockToken = randomUUID();
+
+    // Recover a crashed process, but never allow two fresh runs to claim the
+    // source at the same time.
+    await this.scrapingRunModel.updateMany(
+      { source: TURNOS_SOURCE, status: 'running', startedAt: { $lt: new Date(Date.now() - 2 * 60 * 60 * 1000) } },
+      { $set: { status: 'failed', finishedAt: new Date(), errorMessages: ['Ejecución marcada como vencida al adquirir el lock.'] } },
+    );
+
+    let run: any;
+    try {
+      run = await this.scrapingRunModel.findOneAndUpdate(
+        { source: TURNOS_SOURCE, status: 'running' },
+        { $setOnInsert: { source: TURNOS_SOURCE, status: 'running', startedAt, lockToken } },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ).select('+lockToken').lean();
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        this.logger.log('[Handler] Scraping already claimed by another request; skipping duplicate request.');
+        return;
+      }
+      throw error;
+    }
+
+    if (!run || run.lockToken !== lockToken) {
+      this.logger.log('[Handler] Scraping already running; skipping duplicate request.');
+      return;
+    }
+
     try {
       const scraped = await this.turnosJujuyScraper.scrape();
       await this.scrapingRunModel.updateOne({ _id: run._id }, { $set: { recordsFound: scraped.length } });
@@ -51,12 +82,13 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
       }
 
     const normalized = validated.map((item) => {
-      // Turnos Jujuy publishes the current calendar day, but the shift runs
-      // from 08:00 to 08:00. Before 08:00, the active shift started yesterday.
+      // The source labels the next calendar day even while the previous
+      // 08:00-08:00 shift is still active. Keep the calculation in Argentina
+      // time and never subtract twice when the source already returned the
+      // previous day's date.
       const dutyStartDate = this.getDutyStartDate(item.dutyDate);
-      const start = new Date(`${dutyStartDate}T08:00:00`);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
+      const start = new Date(`${dutyStartDate}T08:00:00-03:00`);
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
       return {
         name: item.name,
         sourceId: item.sourceId,
@@ -225,12 +257,42 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
   }
 
   private getDutyStartDate(publishedDate: string): string {
-    const now = new Date();
-    if (now.getHours() >= 8) return publishedDate;
+    const now = this.getArgentinaClock();
 
-    const previousDay = new Date(`${publishedDate}T12:00:00`);
-    previousDay.setDate(previousDay.getDate() - 1);
-    return previousDay.toISOString().slice(0, 10);
+    // After 08:00, the published date is today's duty window. Before 08:00,
+    // only shift a source date that is actually today. If the source already
+    // returned yesterday's date, it is already the active window.
+    if (now.hour >= 8 || publishedDate !== now.date) return publishedDate;
+
+    const previousDay = new Date(`${publishedDate}T12:00:00-03:00`);
+    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+    return this.formatArgentinaDate(previousDay);
+  }
+
+  private getArgentinaClock(): { date: string; hour: number } {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return {
+      date: `${values.year}-${values.month}-${values.day}`,
+      hour: Number(values.hour),
+    };
+  }
+
+  private formatArgentinaDate(date: Date): string {
+    const values = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date).map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
   }
 
   private async saveNormalizedPharmaciesBatch(pharmacies: any[]): Promise<number> {

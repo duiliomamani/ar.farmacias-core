@@ -14,6 +14,10 @@ export class ScrapingRun {
   @Prop({ required: true })
   startedAt!: Date;
 
+  // Internal token used to atomically claim the single active scraping run.
+  @Prop({ select: false })
+  lockToken?: string;
+
   @Prop()
   finishedAt?: Date;
 
@@ -38,3 +42,7 @@ export class ScrapingRun {
 
 export const ScrapingRunSchema = SchemaFactory.createForClass(ScrapingRun);
 ScrapingRunSchema.index({ source: 1, startedAt: -1 });
+ScrapingRunSchema.index(
+  { source: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'running' } },
+);

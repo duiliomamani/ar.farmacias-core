@@ -29,7 +29,7 @@ export class ScrapingController {
   }
 
   @Get('turnos-jujuy')
-  @ApiOperation({ summary: 'Trigger the official Jujuy HTML scraping process (Vercel Cron)' })
+  @ApiOperation({ summary: 'Trigger the official Jujuy HTML scraping process' })
   @ApiHeader({ name: 'x-auth-token', description: '<CRON_SECRET>' })
   @ApiResponse({ status: 200, description: 'Scraping process completed' })
   @ApiResponse({ status: 401, description: 'Invalid cron secret' })
