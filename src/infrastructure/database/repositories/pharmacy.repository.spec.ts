@@ -32,7 +32,9 @@ describe('PharmacyRepository', () => {
 
   const mockReportModel = {
     find: jest.fn().mockReturnValue({
-      sort: jest.fn().mockResolvedValue([]),
+      sort: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([]),
+      }),
     }),
   };
 

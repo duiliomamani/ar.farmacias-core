@@ -62,3 +62,4 @@ PharmacyReportSchema.index(
 // Reports stop affecting results at the end of the 08:00-08:00 duty window
 // and MongoDB removes them shortly afterwards.
 PharmacyReportSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+PharmacyReportSchema.index({ pharmacyId: 1, expiresAt: 1, updatedAt: -1 });

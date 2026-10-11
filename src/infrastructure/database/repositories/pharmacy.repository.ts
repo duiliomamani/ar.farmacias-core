@@ -122,9 +122,11 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     if (pharmacies.length === 0) return [];
 
     const pharmacyIds = pharmacies.map((pharmacy) => pharmacy._id);
+    const recentSince = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const reports = await this.reportModel.find({
       pharmacyId: { $in: pharmacyIds },
       expiresAt: { $gt: new Date() },
+      updatedAt: { $gte: recentSince },
       isSilentlyDiscarded: false,
     }).sort({ createdAt: -1 }).lean();
     const reportsByPharmacy = new Map<string, any[]>();

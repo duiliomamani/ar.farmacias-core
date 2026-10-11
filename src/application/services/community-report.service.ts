@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundExc
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHmac } from 'crypto';
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schemas/pharmacy.schema';
 import { PharmacyReport, PharmacyReportDocument, ReportSource } from '../../infrastructure/database/schemas/pharmacy-report.schema';
 import { GeoValidationService } from '../../infrastructure/security/geo-validation.service';
@@ -22,6 +22,7 @@ export class CommunityReportService {
   ) {}
 
   async submit(pharmacyId: string, lat: number, lng: number, rawDeviceId: string, isOpen: boolean) {
+    if (!isValidObjectId(pharmacyId)) throw new BadRequestException('Identificador de farmacia inválido.');
     const pharmacy = await this.pharmacyModel.findById(pharmacyId);
     if (!pharmacy || !pharmacy.location) throw new NotFoundException('Farmacia o ubicación no encontrada.');
     if (!pharmacy.isVoluntary) {
