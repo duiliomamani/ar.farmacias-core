@@ -5,7 +5,7 @@ import { ScrapeTurnosJujuyCommand } from './scrape-turnos-jujuy.command';
 import { GeoRefService } from '../services/georef.service';
 import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schemas/pharmacy.schema';
 import { Logger } from '@nestjs/common';
-import { TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
+import { TurnosJujuyPharmacy, TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
 
 @CommandHandler(ScrapeTurnosJujuyCommand)
 export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJujuyCommand> {
@@ -32,7 +32,14 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     const scraped = await this.turnosJujuyScraper.scrape();
     if (!scraped.length) return;
 
-    const normalized = scraped.map((item) => {
+    const sourceIds = scraped.map((item) => item.sourceId).filter(Boolean);
+    const validated = await this.validateScrapedPharmacies(scraped);
+    if (!validated.length) {
+      this.logger.warn('[Handler] No valid pharmacy records remained after validation. Existing data was preserved.');
+      return;
+    }
+
+    const normalized = validated.map((item) => {
       // Turnos Jujuy publishes the current calendar day, but the shift runs
       // from 08:00 to 08:00. Before 08:00, the active shift started yesterday.
       const dutyStartDate = this.getDutyStartDate(item.dutyDate);
@@ -41,6 +48,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
       end.setDate(end.getDate() + 1);
       return {
         name: item.name,
+        sourceId: item.sourceId,
         address: item.address,
         originalAddress: item.address,
         city: this.mapCityName(item.city),
@@ -59,7 +67,140 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     });
 
     await this.saveNormalizedPharmaciesBatch(normalized);
+    await this.cleanupTurnosJujuyRecords(normalized, sourceIds);
     this.logger.log(`[Handler] Persisted ${normalized.length} HTML records from turnosjujuy.com.ar`);
+  }
+
+  private async validateScrapedPharmacies(items: TurnosJujuyPharmacy[]): Promise<TurnosJujuyPharmacy[]> {
+    const valid: TurnosJujuyPharmacy[] = [];
+    const identities = new Map<string, { name: string; address: string }>();
+    const coordinates = new Map<string, string[]>();
+
+    for (const item of items) {
+      const sourceId = String(item.sourceId || '').trim();
+      const name = item.name?.trim();
+      const address = item.address?.trim();
+
+      if (!sourceId || !name || !address) {
+        this.logger.warn(`[Validation] Skipping incomplete record: sourceId=${sourceId || 'missing'}, name=${name || 'missing'}`);
+        continue;
+      }
+
+      const identity = {
+        name: this.normalizeIdentity(name),
+        address: this.normalizeIdentity(address),
+      };
+      const previous = identities.get(sourceId);
+      if (previous && (previous.name !== identity.name || previous.address !== identity.address)) {
+        this.logger.error(`[Validation] Conflicting name/address for sourceId=${sourceId}. Record skipped.`);
+        continue;
+      }
+      identities.set(sourceId, identity);
+
+      const hasLatitude = Number.isFinite(item.latitude);
+      const hasLongitude = Number.isFinite(item.longitude);
+      if (hasLatitude !== hasLongitude) {
+        this.logger.warn(`[Validation] Incomplete coordinates for ${name} (${sourceId}); geocoding fallback will be used.`);
+      }
+      if (hasLatitude && hasLongitude) {
+        if (item.latitude! < -90 || item.latitude! > 90 || item.longitude! < -180 || item.longitude! > 180) {
+          this.logger.error(`[Validation] Invalid coordinates for ${name} (${sourceId}). Record skipped.`);
+          continue;
+        }
+        const coordinateKey = `${item.latitude!.toFixed(6)},${item.longitude!.toFixed(6)}`;
+        const owners = coordinates.get(coordinateKey) || [];
+        owners.push(`${name} (${sourceId})`);
+        coordinates.set(coordinateKey, owners);
+      }
+
+      valid.push({ ...item, sourceId, name, address });
+    }
+
+    for (const [coordinateKey, owners] of coordinates) {
+      if (owners.length > 1) {
+        this.logger.warn(`[Validation] Shared coordinates ${coordinateKey}: ${owners.join(', ')}`);
+      }
+    }
+
+    // Protect against a source ID being accidentally assigned to another
+    // pharmacy between scraper runs. We preserve the previous record instead
+    // of overwriting it with a crossed name or address.
+    const sourceIds = valid.map((item) => item.sourceId);
+    if (sourceIds.length > 0) {
+      const existing = await this.pharmacyModel.find({
+        source_type: 'TURNOS_JUJUY_HTML',
+        $or: [
+          { sourceId: { $in: sourceIds } },
+          { 'raw_data.sourceId': { $in: sourceIds } },
+        ],
+      }).select({ sourceId: 1, name: 1, originalAddress: 1, address: 1, raw_data: 1 }).lean();
+
+      const storedBySourceId = new Map<string, any>();
+      for (const record of existing as any[]) {
+        const id = String(record.sourceId || record.raw_data?.sourceId || '');
+        if (id && !storedBySourceId.has(id)) storedBySourceId.set(id, record);
+      }
+
+      return valid.filter((item) => {
+        const stored = storedBySourceId.get(item.sourceId);
+        if (!stored) return true;
+        const storedName = this.normalizeIdentity(stored.name || '');
+        const storedAddress = this.normalizeIdentity(stored.originalAddress || stored.address || stored.raw_data?.address || '');
+        const matches = storedName === this.normalizeIdentity(item.name)
+          && (!storedAddress || storedAddress === this.normalizeIdentity(item.address));
+        if (!matches) {
+          this.logger.error(`[Validation] Identity mismatch for sourceId=${item.sourceId}. Existing record preserved.`);
+        }
+        return matches;
+      });
+    }
+
+    return valid;
+  }
+
+  private normalizeIdentity(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  private async cleanupTurnosJujuyRecords(pharmacies: any[], scrapedSourceIds: string[]): Promise<void> {
+    if (!pharmacies.length) return;
+
+    const currentFrom = new Date(pharmacies[0].dutyFrom).getTime();
+    const currentUntil = new Date(pharmacies[0].dutyUntil).getTime();
+    const activeSourceIds = new Set(scrapedSourceIds);
+    const records = await this.pharmacyModel.find({ source_type: 'TURNOS_JUJUY_HTML' })
+      .select({ sourceId: 1, raw_data: 1, dutyFrom: 1, dutyUntil: 1, updatedAt: 1, createdAt: 1 })
+      .lean();
+
+    const seen = new Set<string>();
+    const idsToDelete: any[] = [];
+    for (const record of records as any[]) {
+      const sourceId = String(record.sourceId || record.raw_data?.sourceId || '');
+      const from = new Date(record.dutyFrom).getTime();
+      const until = new Date(record.dutyUntil).getTime();
+      const sameWindow = from === currentFrom && until === currentUntil;
+
+      if (!sameWindow || !activeSourceIds.has(sourceId)) {
+        idsToDelete.push(record._id);
+        continue;
+      }
+
+      if (seen.has(sourceId)) {
+        idsToDelete.push(record._id);
+      } else {
+        seen.add(sourceId);
+      }
+    }
+
+    if (idsToDelete.length > 0) {
+      await this.pharmacyModel.deleteMany({ _id: { $in: idsToDelete } });
+      this.logger.log(`[Cleanup] Removed ${idsToDelete.length} stale or duplicate HTML records.`);
+    }
   }
 
   private getDutyStartDate(publishedDate: string): string {
@@ -127,11 +268,15 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
           this.logger.debug(`Using official coordinates from turnosjujuy.com.ar for ${data.name}`);
         }
 
-        const filter = { 
-          name: data.name, 
-          city: mappedCity,
+        const filter = {
+          source_type: updateData.source_type,
           dutyFrom: updateData.dutyFrom,
-          dutyUntil: updateData.dutyUntil 
+          dutyUntil: updateData.dutyUntil,
+          $or: [
+            { sourceId: data.sourceId },
+            { 'raw_data.sourceId': data.sourceId },
+            { name: data.name, city: mappedCity },
+          ],
         };
 
         const updateOp: any = {
