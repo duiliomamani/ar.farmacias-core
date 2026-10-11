@@ -25,7 +25,7 @@ export class TurnosJujuyScraperService {
   private readonly logger = new Logger(TurnosJujuyScraperService.name);
   private readonly baseUrl = 'https://turnosjujuy.com.ar/';
   private readonly headers = {
-    'User-Agent': 'FarmaYaAR/1.0 (+https://farmaya.ar)',
+    'User-Agent': 'FarmaJUY/1.0 (+https://farmaya.ar)',
     Accept: 'text/html,application/xhtml+xml',
     'Accept-Language': 'es-AR,es;q=0.9',
   };

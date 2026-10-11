@@ -1,4 +1,4 @@
-# FarmaYa AR — core
+# FarmaJUY — core
 
 API NestJS 11 para turnos de farmacias, scraping oficial HTML de Jujuy, geocodificación, persistencia y feedback.
 

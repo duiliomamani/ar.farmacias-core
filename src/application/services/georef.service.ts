@@ -122,7 +122,7 @@ export class GeoRefService {
           limit: 1,
         },
         headers: {
-          'User-Agent': 'FarmaYa-AR-Backend/1.0',
+          'User-Agent': 'FarmaJUY-Backend/1.0',
         },
         timeout: 5000,
       });

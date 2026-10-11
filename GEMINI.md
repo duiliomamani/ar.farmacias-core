@@ -1,6 +1,6 @@
-# FarmaYa AR - Georeferenced Pharmacy Tracker
+# FarmaJUY - Georeferenced Pharmacy Tracker
 
-FarmaYa AR is a NestJS-based backend system designed to track and georeference on-duty pharmacies in Argentina (initially focusing on the Jujuy province). It consumes the official Jujuy HTML listing and uses multi-source geocoding to provide accurate, real-time information about pharmacy availability.
+FarmaJUY is a NestJS-based backend system designed to track and georeference on-duty pharmacies in Argentina (initially focusing on the Jujuy province). It consumes the official Jujuy HTML listing and uses multi-source geocoding to provide accurate, real-time information about pharmacy availability.
 
 ## Project Overview
 

@@ -2,7 +2,7 @@
   "name": "ar.farmacias-core",
   "version": "1.0.0",
   "packageManager": "pnpm@12.9.1",
-  "description": "FarmaYa AR Backend - Georeferenced Pharmacy On-Duty Tracker",
+  "description": "FarmaJUY Backend - Georeferenced Pharmacy On-Duty Tracker",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
