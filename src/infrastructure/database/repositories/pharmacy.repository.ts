@@ -5,11 +5,13 @@ import { Pharmacy, PharmacyDocument } from '../schemas/pharmacy.schema';
 import { IPharmacyRepository } from '../../../domain/interfaces/pharmacy-system.interface';
 import { Pharmacy as PharmacyEntity } from '../../../domain/entities/pharmacy.entity';
 import { BaseRepository } from './base.repository';
+import { PharmacyReport, PharmacyReportDocument } from '../schemas/pharmacy-report.schema';
 
 @Injectable()
 export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyDocument> implements IPharmacyRepository {
   constructor(
     @InjectModel(Pharmacy.name) pharmacyModel: Model<PharmacyDocument>,
+    @InjectModel(PharmacyReport.name) private readonly reportModel: Model<PharmacyReportDocument>,
   ) {
     super(pharmacyModel);
   }
@@ -81,7 +83,7 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     };
 
     const pharmacies = await this.model.find(query);
-    return pharmacies.map(doc => this.mapToEntity(doc));
+    return this.mapWithCommunityReports(pharmacies);
   }
 
   async findByDate(date: Date, city?: string): Promise<PharmacyEntity[]> {
@@ -113,10 +115,30 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     }
 
     const pharmacies = await this.model.find(query).sort({ city: 1, name: 1 });
-    return pharmacies.map(doc => this.mapToEntity(doc));
+    return this.mapWithCommunityReports(pharmacies);
   }
 
-  protected mapToEntity(doc: PharmacyDocument): PharmacyEntity {
+  private async mapWithCommunityReports(pharmacies: PharmacyDocument[]): Promise<PharmacyEntity[]> {
+    if (pharmacies.length === 0) return [];
+
+    const pharmacyIds = pharmacies.map((pharmacy) => pharmacy._id);
+    const reports = await this.reportModel.find({
+      pharmacyId: { $in: pharmacyIds },
+      expiresAt: { $gt: new Date() },
+      isSilentlyDiscarded: false,
+    }).sort({ createdAt: -1 }).lean();
+    const reportsByPharmacy = new Map<string, any[]>();
+    for (const report of reports as any[]) {
+      const key = String(report.pharmacyId);
+      const current = reportsByPharmacy.get(key) || [];
+      current.push(report);
+      reportsByPharmacy.set(key, current);
+    }
+
+    return pharmacies.map((doc) => this.mapToEntity(doc, reportsByPharmacy.get(doc._id.toString()) || []));
+  }
+
+  protected mapToEntity(doc: PharmacyDocument, communityReports: any[] = []): PharmacyEntity {
     return new PharmacyEntity({
       id: doc._id.toString(),
       name: doc.name,
@@ -129,7 +151,13 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
       openingHours: doc.openingHours,
       isVoluntary: doc.isVoluntary,
       isPermanentlyOnDuty: doc.isPermanentlyOnDuty,
-      communityReports: [],
+      communityReports: communityReports.map((report) => ({
+        id: report._id?.toString(),
+        isOnDuty: report.isOnDuty,
+        confidence: report.confidence,
+        source: report.source,
+        createdAt: report.updatedAt || report.createdAt,
+      })),
       statusConfidence: 0,
     });
   }

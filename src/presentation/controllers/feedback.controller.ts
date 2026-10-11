@@ -6,11 +6,15 @@ import { Model } from 'mongoose';
 import { SubmitFeedbackDto } from '../../application/dtos/submit-feedback.dto';
 import { ApiRes } from '../../application/dtos/api-response.dto';
 import { Feedback, FeedbackDocument } from '../../infrastructure/database/schemas/feedback.schema';
+import { TurnstileVerificationService } from '../../infrastructure/security/turnstile-verification.service';
 
 @ApiTags('feedback')
 @Controller('api/feedback')
 export class FeedbackController {
-  constructor(@InjectModel(Feedback.name) private readonly feedbackModel: Model<FeedbackDocument>) {}
+  constructor(
+    @InjectModel(Feedback.name) private readonly feedbackModel: Model<FeedbackDocument>,
+    private readonly turnstileVerification: TurnstileVerificationService,
+  ) {}
 
   private readonly counters = new Map<string, { count: number; expiresAt: number }>();
   private globalCounter = { count: 0, expiresAt: 0 };
@@ -31,9 +35,8 @@ export class FeedbackController {
     }
     if (dto.website) return ApiRes.success(true);
 
-    if (process.env.TURNSTILE_SECRET_KEY?.trim()) {
-      const verified = await this.verifyTurnstile(dto.turnstileToken, process.env.TURNSTILE_SECRET_KEY.trim(), ip || 'unknown');
-      if (!verified) throw new ForbiddenException('No se pudo validar la verificación de seguridad.');
+    if (this.turnstileVerification.isConfigured()) {
+      await this.turnstileVerification.assertValid(dto.turnstileToken, 'feedback', ip || 'unknown');
     }
 
     await this.feedbackModel.create({
@@ -75,36 +78,6 @@ export class FeedbackController {
     this.globalCounter.count += 1;
     this.counters.set(ip, counter);
     return true;
-  }
-
-  private async verifyTurnstile(token: string | undefined, secret: string, remoteip: string): Promise<boolean> {
-    if (!token) return false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    try {
-      const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-        method: 'POST',
-        body: new URLSearchParams({ secret, response: token, remoteip }),
-        signal: controller.signal,
-      });
-      if (!response.ok) return false;
-      const result = await response.json() as { success?: boolean; action?: string; hostname?: string };
-      const expectedAction = 'feedback';
-      const configuredHostnames = (process.env.TURNSTILE_HOSTNAMES || '')
-        .split(',')
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean);
-      const allowedHostnames = configuredHostnames.length > 0
-        ? configuredHostnames
-        : process.env.NODE_ENV !== 'production'
-          ? ['localhost', '127.0.0.1']
-          : [];
-      return result.success === true
-        && result.action === expectedAction
-        && !!result.hostname
-        && allowedHostnames.includes(result.hostname.toLowerCase());
-    } catch { return false; }
-    finally { clearTimeout(timeout); }
   }
 
   private async notifyTelegram(dto: SubmitFeedbackDto, page?: string): Promise<void> {

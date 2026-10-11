@@ -17,24 +17,17 @@ export class PharmacyReport {
   @Prop({ required: true })
   deviceId!: string;
 
+  @Prop({ required: true })
+  shiftKey!: string;
+
+  @Prop()
+  sourceId?: string;
+
   @Prop({ type: String })
   userId?: string;
 
-  @Prop({
-    type: {
-      type: String,
-      enum: ['Point'],
-      required: true,
-    },
-    coordinates: {
-      type: [Number],
-      required: true,
-    },
-  })
-  userLocation!: {
-    type: 'Point';
-    coordinates: [number, number];
-  };
+  @Prop({ required: true })
+  distanceMeters!: number;
 
   @Prop({ required: true })
   isOnDuty!: boolean;
@@ -50,10 +43,22 @@ export class PharmacyReport {
 
   @Prop({ default: false })
   isSilentlyDiscarded!: boolean;
+
+  @Prop({ required: true })
+  expiresAt!: Date;
+
+  createdAt!: Date;
+  updatedAt!: Date;
 }
 
 export const PharmacyReportSchema = SchemaFactory.createForClass(PharmacyReport);
 
-// Add TTL index to automatically delete reports after 3 days
-// Community reports are transient; this keeps the database within free tier limits
-PharmacyReportSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 3 });
+// Each device has one mutable report per voluntary pharmacy shift.
+PharmacyReportSchema.index(
+  { pharmacyId: 1, shiftKey: 1, deviceId: 1 },
+  { unique: true, partialFilterExpression: { shiftKey: { $type: 'string' } } },
+);
+
+// Reports stop affecting results at the end of the 08:00-08:00 duty window
+// and MongoDB removes them shortly afterwards.
+PharmacyReportSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

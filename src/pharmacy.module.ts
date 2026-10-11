@@ -19,6 +19,10 @@ import { ScrapingRun, ScrapingRunSchema } from './infrastructure/database/schema
 import { Feedback, FeedbackSchema } from './infrastructure/database/schemas/feedback.schema';
 import { FeedbackController } from './presentation/controllers/feedback.controller';
 import { ScrapingRefreshService } from './application/services/scraping-refresh.service';
+import { PharmacyReport, PharmacyReportSchema } from './infrastructure/database/schemas/pharmacy-report.schema';
+import { CommunityReportController } from './presentation/controllers/community-report.controller';
+import { CommunityReportService } from './application/services/community-report.service';
+import { TurnstileVerificationService } from './infrastructure/security/turnstile-verification.service';
 
 const CommandHandlers = [ScrapeTurnosJujuyHandler];
 const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
@@ -30,11 +34,12 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
       { name: DeviceReputation.name, schema: DeviceReputationSchema },
       { name: ScrapingRun.name, schema: ScrapingRunSchema },
       { name: Feedback.name, schema: FeedbackSchema },
+      { name: PharmacyReport.name, schema: PharmacyReportSchema },
     ]),
     ConfigModule,
     CqrsModule,
   ],
-  controllers: [PharmacyController, ScrapingController, FeedbackController],
+  controllers: [PharmacyController, ScrapingController, FeedbackController, CommunityReportController],
   providers: [
     {
       provide: 'IPharmacyRepository',
@@ -45,6 +50,8 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     ScrapingRefreshService,
     GeoValidationService,
     ReputationService,
+    CommunityReportService,
+    TurnstileVerificationService,
     ...CommandHandlers,
     ...QueryHandlers,
   ],
