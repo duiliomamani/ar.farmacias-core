@@ -90,7 +90,7 @@ export class FeedbackController {
       if (!response.ok) return false;
       const result = await response.json() as { success?: boolean; action?: string; hostname?: string };
       const expectedAction = 'feedback';
-      const configuredHostnames = (process.env.po || '')
+      const configuredHostnames = (process.env.TURNSTILE_HOSTNAMES || '')
         .split(',')
         .map((value) => value.trim().toLowerCase())
         .filter(Boolean);
