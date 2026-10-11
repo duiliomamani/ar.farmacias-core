@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { ScrapeTurnosJujuyCommand } from './scrape-turnos-jujuy.command';
 import { GeoRefService } from '../services/georef.service';
 import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schemas/pharmacy.schema';
+import { ScrapingRun, ScrapingRunDocument } from '../../infrastructure/database/schemas/scraping-run.schema';
 import { Logger } from '@nestjs/common';
 import { TurnosJujuyPharmacy, TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
 
@@ -15,6 +16,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     private readonly geoRefService: GeoRefService,
     private readonly turnosJujuyScraper: TurnosJujuyScraperService,
     @InjectModel(Pharmacy.name) private readonly pharmacyModel: Model<PharmacyDocument>,
+    @InjectModel(ScrapingRun.name) private readonly scrapingRunModel: Model<ScrapingRunDocument>,
   ) { }
 
   async execute(_command: ScrapeTurnosJujuyCommand): Promise<void> {
@@ -29,15 +31,24 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
   }
 
   private async processTurnosJujuy(): Promise<void> {
-    const scraped = await this.turnosJujuyScraper.scrape();
-    if (!scraped.length) return;
+    const startedAt = new Date();
+    const run = await this.scrapingRunModel.create({ source: 'turnosjujuy.com.ar', status: 'running', startedAt });
+    try {
+      const scraped = await this.turnosJujuyScraper.scrape();
+      await this.scrapingRunModel.updateOne({ _id: run._id }, { $set: { recordsFound: scraped.length } });
+      if (!scraped.length) {
+        await this.finishRun(run._id, 'success', { structureChanges: ['No se encontraron filas de farmacias; revisar la estructura HTML.'] });
+        return;
+      }
 
-    const sourceIds = scraped.map((item) => item.sourceId).filter(Boolean);
-    const validated = await this.validateScrapedPharmacies(scraped);
-    if (!validated.length) {
-      this.logger.warn('[Handler] No valid pharmacy records remained after validation. Existing data was preserved.');
-      return;
-    }
+      const sourceIds = scraped.map((item) => item.sourceId).filter(Boolean);
+      const validated = await this.validateScrapedPharmacies(scraped);
+      await this.scrapingRunModel.updateOne({ _id: run._id }, { $set: { recordsValidated: validated.length } });
+      if (!validated.length) {
+        this.logger.warn('[Handler] No valid pharmacy records remained after validation. Existing data was preserved.');
+        await this.finishRun(run._id, 'success', { structureChanges: ['Los registros encontrados no pasaron la validación.'] });
+        return;
+      }
 
     const normalized = validated.map((item) => {
       // Turnos Jujuy publishes the current calendar day, but the shift runs
@@ -66,9 +77,18 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
       };
     });
 
-    await this.saveNormalizedPharmaciesBatch(normalized);
-    await this.cleanupTurnosJujuyRecords(normalized, sourceIds);
-    this.logger.log(`[Handler] Persisted ${normalized.length} HTML records from turnosjujuy.com.ar`);
+      const saved = await this.saveNormalizedPharmaciesBatch(normalized);
+      const staleRemoved = await this.cleanupTurnosJujuyRecords(normalized, sourceIds);
+      await this.finishRun(run._id, 'success', { recordsSaved: saved, staleRemoved });
+      this.logger.log(`[Handler] Persisted ${saved} HTML records from turnosjujuy.com.ar`);
+    } catch (error: any) {
+      await this.finishRun(run._id, 'failed', { errorMessages: [error?.message || 'Error desconocido durante el scraping'] });
+      throw error;
+    }
+  }
+
+  private async finishRun(id: any, status: 'success' | 'failed', data: Partial<ScrapingRun>): Promise<void> {
+    await this.scrapingRunModel.updateOne({ _id: id }, { $set: { ...data, status, finishedAt: new Date() } });
   }
 
   private async validateScrapedPharmacies(items: TurnosJujuyPharmacy[]): Promise<TurnosJujuyPharmacy[]> {
@@ -167,8 +187,8 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
       .trim();
   }
 
-  private async cleanupTurnosJujuyRecords(pharmacies: any[], scrapedSourceIds: string[]): Promise<void> {
-    if (!pharmacies.length) return;
+  private async cleanupTurnosJujuyRecords(pharmacies: any[], scrapedSourceIds: string[]): Promise<number> {
+    if (!pharmacies.length) return 0;
 
     const currentFrom = new Date(pharmacies[0].dutyFrom).getTime();
     const currentUntil = new Date(pharmacies[0].dutyUntil).getTime();
@@ -201,6 +221,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
       await this.pharmacyModel.deleteMany({ _id: { $in: idsToDelete } });
       this.logger.log(`[Cleanup] Removed ${idsToDelete.length} stale or duplicate HTML records.`);
     }
+    return idsToDelete.length;
   }
 
   private getDutyStartDate(publishedDate: string): string {
@@ -212,7 +233,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     return previousDay.toISOString().slice(0, 10);
   }
 
-  private async saveNormalizedPharmaciesBatch(pharmacies: any[]): Promise<void> {
+  private async saveNormalizedPharmaciesBatch(pharmacies: any[]): Promise<number> {
     const BATCH_SIZE = 5; // Process geocoding in small concurrent batches
     const bulkOps: any[] = [];
 
@@ -321,9 +342,10 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
     } else {
       this.logger.log(`[Handler] No operations to perform in this batch.`);
     }
+    return bulkOps.length;
   }
 
-  private async saveNormalizedPharmacies(pharmacies: any[]): Promise<void> {
+  private async saveNormalizedPharmacies(pharmacies: any[]): Promise<number> {
     // Deprecated in favor of saveNormalizedPharmaciesBatch
     return this.saveNormalizedPharmaciesBatch(pharmacies);
   }

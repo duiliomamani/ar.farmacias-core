@@ -2,17 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Pharmacy, PharmacyDocument } from '../schemas/pharmacy.schema';
-import { PharmacyReport, PharmacyReportDocument } from '../schemas/pharmacy-report.schema';
 import { IPharmacyRepository } from '../../../domain/interfaces/pharmacy-system.interface';
 import { Pharmacy as PharmacyEntity } from '../../../domain/entities/pharmacy.entity';
-import { PharmacyReport as PharmacyReportEntity } from '../../../domain/entities/pharmacy-report.entity';
 import { BaseRepository } from './base.repository';
 
 @Injectable()
 export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyDocument> implements IPharmacyRepository {
   constructor(
     @InjectModel(Pharmacy.name) pharmacyModel: Model<PharmacyDocument>,
-    @InjectModel(PharmacyReport.name) private readonly reportModel: Model<PharmacyReportDocument>,
   ) {
     super(pharmacyModel);
   }
@@ -82,7 +79,7 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     };
 
     const pharmacies = await this.model.find(query);
-    return Promise.all(pharmacies.map(doc => this.mapToEntityWithReports(doc)));
+    return pharmacies.map(doc => this.mapToEntity(doc));
   }
 
   async findByDate(date: Date, city?: string): Promise<PharmacyEntity[]> {
@@ -110,47 +107,7 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
     }
 
     const pharmacies = await this.model.find(query).sort({ city: 1, name: 1 });
-    return Promise.all(pharmacies.map(doc => this.mapToEntityWithReports(doc)));
-  }
-
-  private async mapToEntityWithReports(doc: PharmacyDocument): Promise<PharmacyEntity> {
-    const entity = this.mapToEntity(doc);
-    
-    // Fetch recent community reports (last 4 hours)
-    const fourHoursAgo = new Date();
-    fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
-
-    const reports = await this.reportModel
-      .find({ 
-        pharmacyId: doc._id, 
-        isSilentlyDiscarded: false,
-        createdAt: { $gte: fourHoursAgo }
-      })
-      .sort({ createdAt: -1 });
-
-    entity.communityReports = reports.slice(0, 5).map(r => new PharmacyReportEntity({
-      id: r._id.toString(),
-      isOnDuty: r.isOnDuty,
-      confidence: r.confidence,
-      source: r.source,
-      imageUrl: r.imageUrl,
-      createdAt: (r as any).createdAt,
-    }));
-
-    // Calculate Aggregate Confidence
-    // 1. High-reputation user report (confidence 1.0)
-    const hasHighTrustReport = reports.some(r => r.confidence >= 1.0);
-    
-    // 2. Quantity of reports (10+ reports)
-    const hasConsensus = reports.length >= 10;
-
-    if (hasHighTrustReport || hasConsensus) {
-      entity.statusConfidence = 1.0;
-    } else {
-      entity.statusConfidence = Math.min(reports.length * 0.1, 0.9);
-    }
-
-    return entity;
+    return pharmacies.map(doc => this.mapToEntity(doc));
   }
 
   protected mapToEntity(doc: PharmacyDocument): PharmacyEntity {
@@ -166,6 +123,8 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
       openingHours: doc.openingHours,
       isVoluntary: doc.isVoluntary,
       isPermanentlyOnDuty: doc.isPermanentlyOnDuty,
+      communityReports: [],
+      statusConfidence: 0,
     });
   }
 }

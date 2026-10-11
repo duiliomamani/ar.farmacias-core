@@ -1,9 +1,12 @@
 import { Controller, Post, Headers, UnauthorizedException, Logger, Get } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { CommandBus } from '@nestjs/cqrs';
 import { ScrapeTurnosJujuyCommand } from '../../application/commands/scrape-turnos-jujuy.command';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { ApiRes } from '../../application/dtos/api-response.dto';
+import { ScrapingRun, ScrapingRunDocument } from '../../infrastructure/database/schemas/scraping-run.schema';
 
 @ApiTags('scraping')
 @Controller('api/scraping')
@@ -13,7 +16,17 @@ export class ScrapingController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly configService: ConfigService,
+    @InjectModel(ScrapingRun.name) private readonly scrapingRunModel: Model<ScrapingRunDocument>,
   ) { }
+
+  @Get('turnos-jujuy/status')
+  @ApiOperation({ summary: 'Get the latest official Jujuy HTML scraping status' })
+  async getTurnosJujuyStatus() {
+    const latest = await this.scrapingRunModel.findOne({ source: 'turnosjujuy.com.ar' })
+      .sort({ startedAt: -1 })
+      .lean();
+    return ApiRes.success(latest || null);
+  }
 
   @Get('turnos-jujuy')
   @ApiOperation({ summary: 'Trigger the official Jujuy HTML scraping process (Vercel Cron)' })
