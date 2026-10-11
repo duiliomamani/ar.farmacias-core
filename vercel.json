@@ -22,7 +22,7 @@
   ],
   "crons": [
     {
-      "path": "/api/scraping/colfarjuy",
+      "path": "/api/scraping/turnos-jujuy",
       "schedule": "0 4 * * *"
     }
   ]

@@ -1,87 +1,74 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { ScrapeColfarjuyCommand } from './scrape-colfarjuy.command';
-import { ColfarjuyScraperService } from '../services/colfarjuy-scraper.service';
-import { AiNormalizerService } from '../services/ai-normalizer.service';
+import { ScrapeTurnosJujuyCommand } from './scrape-turnos-jujuy.command';
 import { GeoRefService } from '../services/georef.service';
 import { Pharmacy, PharmacyDocument } from '../../infrastructure/database/schemas/pharmacy.schema';
 import { Logger } from '@nestjs/common';
+import { TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
 
-@CommandHandler(ScrapeColfarjuyCommand)
-export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCommand> {
-  private readonly logger = new Logger(ScrapeColfarjuyHandler.name);
+@CommandHandler(ScrapeTurnosJujuyCommand)
+export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJujuyCommand> {
+  private readonly logger = new Logger(ScrapeTurnosJujuyHandler.name);
 
   constructor(
-    private readonly colfarjuyScraper: ColfarjuyScraperService,
-    private readonly aiNormalizerService: AiNormalizerService,
     private readonly geoRefService: GeoRefService,
+    private readonly turnosJujuyScraper: TurnosJujuyScraperService,
     @InjectModel(Pharmacy.name) private readonly pharmacyModel: Model<PharmacyDocument>,
   ) { }
 
-  async execute(_command: ScrapeColfarjuyCommand): Promise<void> {
-    this.logger.log('[Handler] === Executing Colfarjuy Scraping Command ===');
+  async execute(_command: ScrapeTurnosJujuyCommand): Promise<void> {
+    this.logger.log('[Handler] === Executing turnosjujuy.com.ar scraping command ===');
 
     try {
-      await this.processRegion('Capital');
-      await this.processRegion('Interior');
+      await this.processTurnosJujuy();
     } catch (error: any) {
       this.logger.error(`Scraping command failed: ${error.message}`);
       throw error;
     }
   }
 
-  private async processRegion(region: 'Capital' | 'Interior'): Promise<void> {
-    this.logger.log(`[Handler] >>> Starting processing for region: ${region} <<<`);
-    const scrapedResults = await this.colfarjuyScraper.scrapeRegion(region);
-    
-    if (!scrapedResults || scrapedResults.length === 0) {
-      this.logger.warn(`[Handler] No content scraped for ${region}. Skipping.`);
-      return;
-    }
+  private async processTurnosJujuy(): Promise<void> {
+    const scraped = await this.turnosJujuyScraper.scrape();
+    if (!scraped.length) return;
 
-    // Calculate Monday of the current week (local time)
+    const normalized = scraped.map((item) => {
+      // Turnos Jujuy publishes the current calendar day, but the shift runs
+      // from 08:00 to 08:00. Before 08:00, the active shift started yesterday.
+      const dutyStartDate = this.getDutyStartDate(item.dutyDate);
+      const start = new Date(`${dutyStartDate}T08:00:00`);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return {
+        name: item.name,
+        address: item.address,
+        originalAddress: item.address,
+        city: this.mapCityName(item.city),
+        phone: item.phone,
+        isOnDuty: item.isOnDuty,
+        dutyFrom: start.toISOString(),
+        dutyUntil: end.toISOString(),
+        openingHours: item.openingHours,
+        isPermanentlyOnDuty: item.isPermanentlyOnDuty,
+        source_type: 'TURNOS_JUJUY_HTML',
+        raw_data: item,
+        location: item.latitude && item.longitude
+          ? { type: 'Point', coordinates: [item.longitude, item.latitude] }
+          : undefined,
+      };
+    });
+
+    await this.saveNormalizedPharmaciesBatch(normalized);
+    this.logger.log(`[Handler] Persisted ${normalized.length} HTML records from turnosjujuy.com.ar`);
+  }
+
+  private getDutyStartDate(publishedDate: string): string {
     const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const mondayOfCurrentWeek = new Date(now);
-    mondayOfCurrentWeek.setDate(now.getDate() + diffToMonday);
-    mondayOfCurrentWeek.setHours(0, 0, 0, 0);
+    if (now.getHours() >= 8) return publishedDate;
 
-    const weeksToScrape = 2;
-
-    for (const content of scrapedResults) {
-      if (!content.pdfBuffer) {
-        this.logger.warn(`[Handler] Skipping content block for ${content.inferredCity || region} because no PDF buffer is available.`);
-        continue;
-      }
-
-      for (let i = 0; i < weeksToScrape; i++) {
-        const start = new Date(mondayOfCurrentWeek);
-        start.setDate(mondayOfCurrentWeek.getDate() + (i * 7));
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-
-        const dateRange = {
-          start: start.toISOString().split('T')[0],
-          end: end.toISOString().split('T')[0]
-        };
-
-        this.logger.log(`[Handler] Processing ${region} PDF block (Inferred City: ${content.inferredCity || 'Unknown'}) for range ${dateRange.start} - ${dateRange.end}`);
-        
-        const structuredData = await this.aiNormalizerService.normalizeColfarjuyText(
-          region, 
-          dateRange, 
-          content.inferredCity,
-          content.pdfBuffer
-        );
-        
-        if (structuredData && structuredData.length > 0) {
-          this.logger.log(`[Handler] AI extracted ${structuredData.length} records for ${content.inferredCity || region}.`);
-          await this.saveNormalizedPharmaciesBatch(structuredData);
-        }
-      }
-    }
+    const previousDay = new Date(`${publishedDate}T12:00:00`);
+    previousDay.setDate(previousDay.getDate() - 1);
+    return previousDay.toISOString().slice(0, 10);
   }
 
   private async saveNormalizedPharmaciesBatch(pharmacies: any[]): Promise<void> {
@@ -109,20 +96,10 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
           return null;
         }
 
-        // Geocoding is the bottleneck. We parallelize it within the chunk.
-        this.logger.log(`Geocoding address for ${data.name} in ${mappedCity}: ${data.address}`);
-        const geo = await this.geoRefService.geocodeAddress(data.address, mappedCity, data.name);
-        
-        if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
-          this.logger.log(`✅ Geocoded ${data.name} successfully at [${geo.lat}, ${geo.lng}]`);
-        } else {
-          this.logger.warn(`❌ Geocoding failed or returned invalid coordinates for ${data.name} (${data.address})`);
-        }
-        
         const updateData: any = {
           ...data,
           city: mappedCity,
-          source_type: 'COLFARJUY_OFFICIAL',
+          source_type: data.source_type || 'TURNOS_JUJUY_HTML',
           isOnDuty: data.isOnDuty ?? true,
           dutyFrom: dutyFromDate,
           dutyUntil: dutyUntilDate,
@@ -131,6 +108,24 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
           isVoluntary: data.isVoluntary ?? false,
           updatedAt: new Date(),
         };
+
+        const hasSourceLocation =
+          Number.isFinite(updateData.location?.coordinates?.[0]) &&
+          Number.isFinite(updateData.location?.coordinates?.[1]);
+
+        let geo: any = null;
+        if (!hasSourceLocation) {
+          this.logger.log(`Geocoding address for ${data.name} in ${mappedCity}: ${data.address}`);
+          geo = await this.geoRefService.geocodeAddress(data.address, mappedCity, data.name);
+
+          if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+            this.logger.log(`✅ Geocoded ${data.name} successfully at [${geo.lat}, ${geo.lng}]`);
+          } else {
+            this.logger.warn(`❌ Geocoding failed or returned invalid coordinates for ${data.name} (${data.address})`);
+          }
+        } else {
+          this.logger.debug(`Using official coordinates from turnosjujuy.com.ar for ${data.name}`);
+        }
 
         const filter = { 
           name: data.name, 
@@ -147,7 +142,7 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
           }
         };
 
-        if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+        if (!hasSourceLocation && geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
           updateData.location = {
             type: 'Point',
             coordinates: [geo.lng, geo.lat],
@@ -157,7 +152,7 @@ export class ScrapeColfarjuyHandler implements ICommandHandler<ScrapeColfarjuyCo
             municipioId: geo.municipioId,
             localidadId: geo.localidadId,
           };
-        } else {
+        } else if (!updateData.location) {
           delete updateData.location;
           updateOp.updateOne.update.$unset = { location: "" };
         }

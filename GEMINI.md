@@ -1,6 +1,6 @@
 # FarmaYa AR - Georeferenced Pharmacy Tracker
 
-FarmaYa AR is a NestJS-based backend system designed to track and georeference on-duty pharmacies in Argentina (initially focusing on the Jujuy province). It leverages AI-driven OCR text normalization and multi-source geocoding to provide accurate, real-time information about pharmacy availability.
+FarmaYa AR is a NestJS-based backend system designed to track and georeference on-duty pharmacies in Argentina (initially focusing on the Jujuy province). It consumes the official Jujuy HTML listing and uses multi-source geocoding to provide accurate, real-time information about pharmacy availability.
 
 ## Project Overview
 
@@ -9,15 +9,14 @@ FarmaYa AR is a NestJS-based backend system designed to track and georeference o
 - **Language:** TypeScript
 - **Architecture:** CQRS (Command Query Responsibility Segregation)
 - **Database:** MongoDB (Mongoose)
-- **AI Integration:** Google Gemini API (`@google/genai`) for text normalization
 - **Geocoding:** Official Argentina Georef API & Nominatim (OpenStreetMap) fallback
-- **Parsing:** Cheerio (HTML), pdf-parse (PDF)
+- **Parsing:** Axios and Cheerio (HTML)
 
 ### Main Architecture
 The project follows a modular structure focused on separation of concerns:
 - **Presentation Layer (`/src/presentation`):** REST controllers for pharmacies, scraping triggers, and community reports.
-- **Application Layer (`/src/application`):** CQRS Command/Query handlers and high-level services like AI normalization and geocoding.
-- **Infrastructure Layer (`/src/infrastructure`):** Database schemas, repositories, external scrapers (Colfarjuy), and security services.
+- **Application Layer (`/src/application`):** CQRS Command/Query handlers, HTML scraping, and geocoding services.
+- **Infrastructure Layer (`/src/infrastructure`):** Database schemas, repositories, geocoding clients, and security services.
 - **Domain Layer (`/src/domain`):** Core entities and repository interfaces.
 
 ## Building and Running
@@ -25,24 +24,22 @@ The project follows a modular structure focused on separation of concerns:
 ### Prerequisites
 - Node.js (v20+)
 - Docker and Docker Compose (for local MongoDB)
-- Gemini API Key (set in `.env` as `GEMINI_API_KEY`)
 
 ### Commands
-- **Install Dependencies:** `npm install`
-- **Start Infrastructure:** `npm run infra:up` (Starts MongoDB via Docker)
-- **Run Development Server:** `npm run start:dev`
-- **Build for Production:** `npm run build`
-- **Run Tests:** `npm run test`
-- **Check Coverage:** `npm run test:cov`
-- **Linting:** `npm run lint`
+- **Install Dependencies:** `pnpm install`
+- **Start Infrastructure:** `pnpm infra:up` (Starts MongoDB via Docker)
+- **Run Development Server:** `pnpm start:dev`
+- **Build for Production:** `pnpm build`
+- **Run Tests:** `pnpm test`
+- **Check Coverage:** `pnpm test:cov`
+- **Linting:** `pnpm lint`
 
 ## Development Conventions
 
-### AI-Driven Normalization
-The system uses the Gemini API to parse unstructured text from pharmacy schedules (often visual grids or collapsed OCR text).
-- **Service:** `AiNormalizerService`
-- **Workflow:** Raw text -> Gemini Prompt -> JSON Array (validated with Zod 4).
-- **Optimization:** Data is processed in 7-day chunks to avoid model output token limits.
+### Official HTML Scraping
+The system reads `turnosjujuy.com.ar`, discovers every locality from the HTML selector, submits the locality form, and maps structured rows directly into pharmacy records.
+- **Service:** `TurnosJujuyScraperService`
+- **Workflow:** HTML rows and embedded map coordinates -> typed pharmacy records -> geocoding fallback -> MongoDB upsert.
 
 ### Geocoding Strategy
 - **Service:** `GeoRefService`
@@ -65,7 +62,7 @@ This project follows a strict agentic development workflow defined in `AGENTS.md
 
 ### Testing Standards
 - Unit tests are located alongside source files (`.spec.ts`).
-- Mocking of external services (Axios, Gemini) is required.
+- Mocking of external services (Axios and geocoding providers) is required.
 - New features are incomplete without passing tests and coverage verification.
 
 ## Security and Authentication
@@ -83,7 +80,6 @@ This project follows a strict agentic development workflow defined in `AGENTS.md
 ### Environment Variables (.env)
 ```env
 MONGODB_URI=mongodb://localhost:27017/farmaya
-GEMINI_API_KEY=your_key
 GOOGLE_CLIENT_ID=your_id
 GOOGLE_CLIENT_SECRET=your_secret
 GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback

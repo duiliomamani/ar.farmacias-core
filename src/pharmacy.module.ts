@@ -9,20 +9,18 @@ import { PharmacyController } from './presentation/controllers/pharmacy.controll
 import { PharmacyReportController } from './presentation/controllers/pharmacy-report.controller';
 import { ScrapingController } from './presentation/controllers/scraping.controller';
 import { GeoRefService } from './application/services/georef.service';
-import { AiNormalizerService } from './application/services/ai-normalizer.service';
-import { ScraperFactory } from './application/services/scraper.factory';
 import { GeoValidationService } from './infrastructure/security/geo-validation.service';
 import { ReputationService } from './infrastructure/security/reputation.service';
-import { ColfarjuyScraperService } from './application/services/colfarjuy-scraper.service';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user.module';
 
-import { ScrapeColfarjuyHandler } from './application/commands/scrape-colfarjuy.handler';
+import { ScrapeTurnosJujuyHandler } from './application/commands/scrape-turnos-jujuy.handler';
 import { SubmitPharmacyReportHandler } from './application/commands/submit-pharmacy-report.handler';
 import { GetNearbyPharmaciesHandler } from './application/queries/get-nearby-pharmacies.handler';
 import { GetPharmaciesByDateHandler } from './application/queries/get-pharmacies-by-date.handler';
+import { TurnosJujuyScraperService } from './application/services/turnos-jujuy-scraper.service';
 
-const CommandHandlers = [ScrapeColfarjuyHandler, SubmitPharmacyReportHandler];
+const CommandHandlers = [ScrapeTurnosJujuyHandler, SubmitPharmacyReportHandler];
 const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
 
 @Module({
@@ -43,9 +41,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
       useClass: PharmacyRepository,
     },
     GeoRefService,
-    AiNormalizerService,
-    ScraperFactory,
-    ColfarjuyScraperService,
+    TurnosJujuyScraperService,
     GeoValidationService,
     ReputationService,
     ...CommandHandlers,
@@ -53,9 +49,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
   ],
   exports: [
     GeoRefService,
-    AiNormalizerService,
-    ScraperFactory,
-    ColfarjuyScraperService,
+    TurnosJujuyScraperService,
     'IPharmacyRepository',
     GeoValidationService,
     ReputationService,
