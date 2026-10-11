@@ -40,7 +40,7 @@ describe('GeoValidationService', () => {
     it('should throw BadRequestException if outside max distance', () => {
       expect(() =>
         service.validateGeofence(0, 0, 1, 1, 100),
-      ).toThrow(BadRequestException);
+      ).toThrow('Acercate un poco más para confirmar el estado de la farmacia. Tenés que estar a menos de 100 m y ahora estás a 157249 m.');
     });
 
     it('should use default distance of 100m if not provided', () => {

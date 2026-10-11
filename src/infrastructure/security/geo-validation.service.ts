@@ -31,7 +31,7 @@ export class GeoValidationService {
     const distance = this.getDistance(userLat, userLng, pharmacyLat, pharmacyLng);
     if (distance > maxDistanceMeters) {
       throw new BadRequestException(
-        `You must be physically near the pharmacy to report it (Current distance: ${Math.round(distance)}m)`,
+        `Acercate un poco más para confirmar el estado de la farmacia. Tenés que estar a menos de ${maxDistanceMeters} m y ahora estás a ${Math.round(distance)} m.`,
       );
     }
     return true;
