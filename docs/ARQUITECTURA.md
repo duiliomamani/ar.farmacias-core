@@ -31,7 +31,7 @@ flowchart LR
 
 ### Principios de comunicación
 
-1. El navegador no conoce `FARMACIAS_API_URL` ni llama directamente al core.
+1. El navegador no conoce `CONDORJUY_API_URL` ni llama directamente al core.
 2. Las consultas del frontend pasan por las Route Handlers de Next.js.
 3. El BFF agrega timeout, normaliza errores y reenvía las solicitudes al core.
 4. El core es responsable de validación, autorización de origen, rate limiting, scraping y persistencia.
@@ -376,7 +376,7 @@ sequenceDiagram
 Frontend (`ar.farmacias-ui/.env.local`):
 
 ```env
-FARMACIAS_API_URL=http://localhost:5001
+CONDORJUY_API_URL=http://localhost:5001
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=...
 ```
 
@@ -544,7 +544,7 @@ Si se modifican variables `NEXT_PUBLIC_*`, hay que reiniciar Next.js porque se i
 
 | Variable | Obligatoria | Descripción |
 |---|---:|---|
-| `FARMACIAS_API_URL` | Sí | URL privada del core, usada solo por el BFF |
+| `CONDORJUY_API_URL` | Sí | URL privada del core, usada solo por el BFF |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | En producción | Site key pública del widget |
 
 No se deben volver a agregar `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` ni `GOOGLE_CALLBACK_URL`: el módulo de autenticación fue retirado del alcance actual.
