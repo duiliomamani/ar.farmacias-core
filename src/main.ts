@@ -29,7 +29,7 @@ async function createApp() {
   }));
 
   const config = new DocumentBuilder()
-    .setTitle('FarmaJUY API')
+    .setTitle('CondorJUY API')
     .setDescription('Georeferenced Pharmacy On-Duty Tracker for Argentina')
     .setVersion('1.0')
     .addTag('pharmacies')

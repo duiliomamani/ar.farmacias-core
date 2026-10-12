@@ -1,8 +1,8 @@
-# FarmaJUY — documentación técnica
+# CondorJUY — documentación técnica
 
 ## 1. Propósito
 
-FarmaJUY permite consultar farmacias de turno y permanentes de Jujuy, ubicarlas en un mapa, calcular rutas y recibir feedback de los usuarios.
+CondorJUY permite consultar servicios esenciales de Jujuy, ubicarlos en un mapa, calcular rutas y recibir feedback de los usuarios.
 
 La solución está dividida en dos aplicaciones:
 
@@ -15,7 +15,7 @@ La fuente oficial de turnos es `https://turnosjujuy.com.ar/`. La información se
 
 ```mermaid
 flowchart LR
-    U[Usuario] --> UI[Next.js / FarmaJUY UI]
+    U[Usuario] --> UI[Next.js / CondorJUY UI]
     UI --> BFF[Next.js BFF\n/api/*]
     BFF --> CORE[NestJS / farmacias-core]
     CORE --> DB[(MongoDB)]

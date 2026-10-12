@@ -85,7 +85,7 @@ export class FeedbackController {
     const chatId = process.env.FEEDBACK_CHAT_ID?.trim();
     if (!token || !chatId) return;
     const labels = { problem: 'Problema', suggestion: 'Sugerencia', comment: 'Comentario' };
-    const text = `🟢 <b>Nuevo feedback de FarmaJUY</b>\n\n<b>Tipo:</b> ${labels[dto.topic]}\n<b>Mensaje:</b> ${this.escapeHtml(dto.message)}\n<b>Página:</b> ${this.escapeHtml(dto.page || page || '/')}`;
+    const text = `🟢 <b>Nuevo feedback de CondorJUY</b>\n\n<b>Tipo:</b> ${labels[dto.topic]}\n<b>Mensaje:</b> ${this.escapeHtml(dto.message)}\n<b>Página:</b> ${this.escapeHtml(dto.page || page || '/')}`;
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),

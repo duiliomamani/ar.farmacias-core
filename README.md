@@ -1,6 +1,6 @@
-# FarmaJUY — core
+# CondorJUY — core
 
-API NestJS 11 para turnos de farmacias, scraping oficial HTML de Jujuy, geocodificación, persistencia y feedback.
+API NestJS 11 para servicios esenciales de Jujuy, scraping oficial HTML de farmacias, geocodificación, persistencia y feedback.
 
 La documentación completa está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 

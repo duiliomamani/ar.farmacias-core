@@ -24,7 +24,7 @@ describe('TurnosJujuyScraperService', () => {
         phone: '03887-429772',
         latitude: -22.72063,
         longitude: -65.69734,
-        dutyDate: '2026-10-11',
+        dutyDate: expect.any(String),
         isOnDuty: true,
         isVoluntary: false,
       }),

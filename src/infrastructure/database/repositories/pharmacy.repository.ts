@@ -6,6 +6,7 @@ import { IPharmacyRepository } from '../../../domain/interfaces/pharmacy-system.
 import { Pharmacy as PharmacyEntity } from '../../../domain/entities/pharmacy.entity';
 import { BaseRepository } from './base.repository';
 import { PharmacyReport, PharmacyReportDocument } from '../schemas/pharmacy-report.schema';
+import { buildCityMongoRegex, normalizeLocalityName, toTitleCase } from '../../../application/services/locality-utils';
 
 @Injectable()
 export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyDocument> implements IPharmacyRepository {
@@ -110,8 +111,8 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
       ],
     };
 
-    if (city) {
-      query.city = city;
+    if (city && city.trim()) {
+      query.city = { $regex: buildCityMongoRegex(city) };
     }
 
     const pharmacies = await this.model.find(query).sort({ city: 1, name: 1 });
@@ -143,8 +144,8 @@ export class PharmacyRepository extends BaseRepository<PharmacyEntity, PharmacyD
   protected mapToEntity(doc: PharmacyDocument, communityReports: any[] = []): PharmacyEntity {
     return new PharmacyEntity({
       id: doc._id.toString(),
-      name: doc.name,
-      city: doc.city,
+      name: toTitleCase(doc.name || ''),
+      city: normalizeLocalityName(doc.city || ''),
       address: doc.originalAddress,
       location: doc.location,
       isOnDuty: doc.isOnDuty,

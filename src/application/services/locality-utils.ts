@@ -88,3 +88,64 @@ export function normalizeLocalityName(rawName: string): string {
   return toTitleCase(rawName);
 }
 
+export function localityKey(name: string): string {
+  const normalized = normalizeLocalityName(name);
+  return cleanText(normalized)
+    .replace(/^san pedro de jujuy$/, 'san pedro')
+    .replace(/^libertador gral\.? san martin$/, 'libertador');
+}
+
+export function buildCityMongoRegex(city: string): RegExp {
+  const key = localityKey(city);
+  if (key === 'perico') {
+    return /perico/i;
+  }
+  if (key === 'monterrico') {
+    return /monterrico/i;
+  }
+  if (key === 'san salvador de jujuy') {
+    return /(san salvador|s\.s\.\s*de\s*jujuy|ssj|capital|jujuy)/i;
+  }
+  if (key === 'libertador') {
+    return /(ldor|libertador|ledesma)/i;
+  }
+  if (key === 'palpala') {
+    return /palpal[aá]/i;
+  }
+  if (key === 'san pedro') {
+    return /san pedro/i;
+  }
+  if (key === 'el carmen') {
+    return /el carmen/i;
+  }
+  if (key === 'fraile pintado') {
+    return /fraile pintado/i;
+  }
+  if (key === 'humahuaca') {
+    return /humahuaca/i;
+  }
+  if (key === 'la quiaca') {
+    return /quiaca/i;
+  }
+  if (key === 'tilcara') {
+    return /tilcara/i;
+  }
+  if (key === 'abra pampa') {
+    return /abra pampa/i;
+  }
+  if (key === 'calilegua') {
+    return /calilegua/i;
+  }
+  if (key === 'yuto') {
+    return /yuto/i;
+  }
+  if (key === 'la esperanza') {
+    return /la esperanza/i;
+  }
+  if (key === 'la mendieta') {
+    return /la mendieta/i;
+  }
+
+  const escaped = cleanText(city).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(escaped, 'i');
+}
