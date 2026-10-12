@@ -2,7 +2,7 @@
   "name": "ar.farmacias-core",
   "version": "1.0.0",
   "packageManager": "pnpm@12.9.1",
-  "description": "FarmaJUY Backend - Georeferenced Pharmacy On-Duty Tracker",
+  "description": "CondorJUY Backend - Georeferenced Essential Services Tracker",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
