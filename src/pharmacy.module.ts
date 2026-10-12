@@ -29,6 +29,8 @@ import { GeorefController } from './presentation/controllers/georef.controller';
 import { HealthFacilityService } from './application/services/health-facility.service';
 import { FireStationService } from './application/services/fire-station.service';
 import { GeorefJujuyService } from './application/services/georef-jujuy.service';
+import { PoliceStationController } from './presentation/controllers/police-station.controller';
+import { PoliceStationService } from './application/services/police-station.service';
 
 const CommandHandlers = [ScrapeTurnosJujuyHandler];
 const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
@@ -53,6 +55,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     HealthFacilityController,
     FireStationController,
     GeorefController,
+    PoliceStationController,
   ],
   providers: [
     {
@@ -69,6 +72,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     HealthFacilityService,
     FireStationService,
     GeorefJujuyService,
+    PoliceStationService,
     ...CommandHandlers,
     ...QueryHandlers,
   ],
@@ -81,6 +85,7 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     HealthFacilityService,
     FireStationService,
     GeorefJujuyService,
+    PoliceStationService,
   ],
 })
 export class PharmacyModule {}
