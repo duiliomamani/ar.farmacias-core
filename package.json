@@ -1,5 +1,5 @@
 {
-  "name": "ar.farmacias-core",
+  "name": "condorjuy-api",
   "version": "1.0.0",
   "packageManager": "pnpm@12.9.1",
   "description": "CondorJUY Backend - Georeferenced Essential Services Tracker",

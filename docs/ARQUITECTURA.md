@@ -6,8 +6,8 @@ CondorJUY permite consultar servicios esenciales de Jujuy, ubicarlos en un mapa,
 
 La solución está dividida en dos aplicaciones:
 
-- `ar.farmacias-ui`: frontend Next.js 16 con App Router, componentes shadcn/ui `base-nova` sobre Base UI, Leaflet y TanStack Query.
-- `ar.farmacias-core`: API NestJS 11 con CQRS, Mongoose/MongoDB, scraping HTML, geocodificación, rate limiting y validación de feedback.
+- `condorjuy`: frontend Next.js 16 con App Router, componentes shadcn/ui `base-nova` sobre Base UI, Leaflet y TanStack Query.
+- `condorjuy-api`: API NestJS 11 con CQRS, Mongoose/MongoDB, scraping HTML, geocodificación, rate limiting y validación de feedback.
 
 La fuente oficial de turnos es `https://turnosjujuy.com.ar/`. La información se obtiene del HTML renderizado y de los enlaces/coordenadas publicados por esa página. No se utiliza scraping de PDF ni normalización mediante IA.
 
@@ -373,14 +373,14 @@ sequenceDiagram
 
 ### Variables del feedback
 
-Frontend (`ar.farmacias-ui/.env.local`):
+Frontend (`condorjuy/.env.local`):
 
 ```env
 CONDORJUY_API_URL=http://localhost:5001
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=...
 ```
 
-Core (`ar.farmacias-core/.env`):
+Core (`condorjuy-api/.env`):
 
 ```env
 TURNSTILE_SECRET_KEY=...
@@ -505,7 +505,7 @@ docker compose up -d
 ### Core
 
 ```bash
-cd ar.farmacias-core
+cd condorjuy-api
 pnpm install
 pnpm start:dev
 ```
@@ -515,7 +515,7 @@ Por defecto escucha en `http://localhost:5001`.
 ### UI
 
 ```bash
-cd ar.farmacias-ui
+cd condorjuy
 pnpm install
 pnpm dev
 ```
