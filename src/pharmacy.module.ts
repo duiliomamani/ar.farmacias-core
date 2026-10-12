@@ -23,6 +23,12 @@ import { PharmacyReport, PharmacyReportSchema } from './infrastructure/database/
 import { CommunityReportController } from './presentation/controllers/community-report.controller';
 import { CommunityReportService } from './application/services/community-report.service';
 import { TurnstileVerificationService } from './infrastructure/security/turnstile-verification.service';
+import { HealthFacilityController } from './presentation/controllers/health-facility.controller';
+import { FireStationController } from './presentation/controllers/fire-station.controller';
+import { GeorefController } from './presentation/controllers/georef.controller';
+import { HealthFacilityService } from './application/services/health-facility.service';
+import { FireStationService } from './application/services/fire-station.service';
+import { GeorefJujuyService } from './application/services/georef-jujuy.service';
 
 const CommandHandlers = [ScrapeTurnosJujuyHandler];
 const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
@@ -39,7 +45,15 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     ConfigModule,
     CqrsModule,
   ],
-  controllers: [PharmacyController, ScrapingController, FeedbackController, CommunityReportController],
+  controllers: [
+    PharmacyController,
+    ScrapingController,
+    FeedbackController,
+    CommunityReportController,
+    HealthFacilityController,
+    FireStationController,
+    GeorefController,
+  ],
   providers: [
     {
       provide: 'IPharmacyRepository',
@@ -52,6 +66,9 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     ReputationService,
     CommunityReportService,
     TurnstileVerificationService,
+    HealthFacilityService,
+    FireStationService,
+    GeorefJujuyService,
     ...CommandHandlers,
     ...QueryHandlers,
   ],
@@ -61,6 +78,9 @@ const QueryHandlers = [GetNearbyPharmaciesHandler, GetPharmaciesByDateHandler];
     'IPharmacyRepository',
     GeoValidationService,
     ReputationService,
+    HealthFacilityService,
+    FireStationService,
+    GeorefJujuyService,
   ],
 })
 export class PharmacyModule {}
