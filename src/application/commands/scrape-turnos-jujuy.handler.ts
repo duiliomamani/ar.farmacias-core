@@ -9,6 +9,13 @@ import { Logger } from '@nestjs/common';
 import { TurnosJujuyPharmacy, TurnosJujuyScraperService } from '../services/turnos-jujuy-scraper.service';
 import { randomUUID } from 'crypto';
 
+function isValidJujuyCoordinate(lat?: number, lng?: number): boolean {
+  if (lat === undefined || lng === undefined) return false;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat === 0 && lng === 0) return false;
+  return lat <= -21.0 && lat >= -26.0 && lng <= -64.0 && lng >= -68.5;
+}
+
 const TURNOS_SOURCE = 'turnosjujuy.com.ar';
 const SCRAPER_VERSION = 2;
 
@@ -105,8 +112,8 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
         isVoluntary: item.isVoluntary,
         source_type: 'TURNOS_JUJUY_HTML',
         raw_data: item,
-        location: item.latitude && item.longitude
-          ? { type: 'Point', coordinates: [item.longitude, item.latitude] }
+        location: isValidJujuyCoordinate(item.latitude, item.longitude)
+          ? { type: 'Point', coordinates: [item.longitude!, item.latitude!] }
           : undefined,
       };
     });
@@ -157,14 +164,20 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
         this.logger.warn(`[Validation] Incomplete coordinates for ${name} (${sourceId}); geocoding fallback will be used.`);
       }
       if (hasLatitude && hasLongitude) {
-        if (item.latitude! < -90 || item.latitude! > 90 || item.longitude! < -180 || item.longitude! > 180) {
-          this.logger.error(`[Validation] Invalid coordinates for ${name} (${sourceId}). Record skipped.`);
-          continue;
+        if (item.latitude === 0 && item.longitude === 0) {
+          this.logger.warn(`[Validation] Coordinates are [0, 0] for ${name} (${sourceId}); geocoding fallback will be used.`);
+          item.latitude = undefined;
+          item.longitude = undefined;
+        } else if (!isValidJujuyCoordinate(item.latitude, item.longitude)) {
+          this.logger.warn(`[Validation] Coordinates [${item.latitude}, ${item.longitude}] outside Jujuy bounds for ${name} (${sourceId}); geocoding fallback will be used.`);
+          item.latitude = undefined;
+          item.longitude = undefined;
+        } else {
+          const coordinateKey = `${item.latitude!.toFixed(6)},${item.longitude!.toFixed(6)}`;
+          const owners = coordinates.get(coordinateKey) || [];
+          owners.push(`${name} (${sourceId})`);
+          coordinates.set(coordinateKey, owners);
         }
-        const coordinateKey = `${item.latitude!.toFixed(6)},${item.longitude!.toFixed(6)}`;
-        const owners = coordinates.get(coordinateKey) || [];
-        owners.push(`${name} (${sourceId})`);
-        coordinates.set(coordinateKey, owners);
       }
 
       valid.push({ ...item, sourceId, name, address });
@@ -335,17 +348,31 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
           updatedAt: new Date(),
         };
 
-        const hasSourceLocation =
-          Number.isFinite(updateData.location?.coordinates?.[0]) &&
-          Number.isFinite(updateData.location?.coordinates?.[1]);
+        const hasSourceLocation = isValidJujuyCoordinate(
+          updateData.location?.coordinates?.[1],
+          updateData.location?.coordinates?.[0],
+        );
 
         let geo: any = null;
         if (!hasSourceLocation) {
           this.logger.log(`Geocoding address for ${data.name} in ${mappedCity}: ${data.address}`);
-          geo = await this.geoRefService.geocodeAddress(data.address, mappedCity, data.name);
+          geo = await this.geoRefService.geocodeAddress(data.address, mappedCity, data.name, true);
 
-          if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+          if (!geo || !isValidJujuyCoordinate(geo.lat, geo.lng)) {
+            geo = this.geoRefService.getCityCoordinates(mappedCity) || this.geoRefService.getCityCoordinates('San Salvador de Jujuy');
+          }
+
+          if (geo && isValidJujuyCoordinate(geo.lat, geo.lng)) {
             this.logger.log(`✅ Geocoded ${data.name} successfully at [${geo.lat}, ${geo.lng}]`);
+            updateData.location = {
+              type: 'Point',
+              coordinates: [geo.lng, geo.lat],
+            };
+            updateData.georef = {
+              provinciaId: geo.provinciaId || '38',
+              municipioId: geo.municipioId || '',
+              localidadId: geo.localidadId || '',
+            };
           } else {
             this.logger.warn(`❌ Geocoding failed or returned invalid coordinates for ${data.name} (${data.address})`);
           }
@@ -372,17 +399,7 @@ export class ScrapeTurnosJujuyHandler implements ICommandHandler<ScrapeTurnosJuj
           }
         };
 
-        if (!hasSourceLocation && geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
-          updateData.location = {
-            type: 'Point',
-            coordinates: [geo.lng, geo.lat],
-          };
-          updateData.georef = {
-            provinciaId: geo.provinciaId,
-            municipioId: geo.municipioId,
-            localidadId: geo.localidadId,
-          };
-        } else if (!updateData.location) {
+        if (!updateData.location || !isValidJujuyCoordinate(updateData.location.coordinates[1], updateData.location.coordinates[0])) {
           delete updateData.location;
           updateOp.updateOne.update.$unset = { location: "" };
         }
