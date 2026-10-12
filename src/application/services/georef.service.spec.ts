@@ -223,5 +223,28 @@ describe('GeoRefService', () => {
         })
       );
     });
+
+    it('should fallback to city centroid if allowCentroidFallback is true and other strategies fail', async () => {
+      mockedAxios.get.mockResolvedValueOnce({ data: [] }); // Nominatim structured
+      mockedAxios.get.mockResolvedValueOnce({ data: [] }); // Nominatim free query
+      mockedAxios.get.mockResolvedValueOnce({ data: { direcciones: [] } }); // Georef with localidad
+      mockedAxios.get.mockResolvedValueOnce({ data: { direcciones: [] } }); // Georef without localidad
+
+      const result = await service.geocodeAddress('Calle Inexistente 999', 'La Quiaca', undefined, true);
+
+      expect(result).toEqual({
+        lat: -22.1025,
+        lng: -65.5975,
+        provinciaId: '38',
+        municipioId: '38112',
+        localidadId: '',
+      });
+    });
+
+    it('should correctly clean noisy addresses with cleanAddress', () => {
+      expect(service.cleanAddress('9 DE JULIO Nº 137')).toBe('9 DE JULIO 137');
+      expect(service.cleanAddress('Farmacia San Silvestre, Belgrano N° 450 (Local 2) 3885-123456')).toBe('San Silvestre, Belgrano 450');
+      expect(service.cleanAddress('Alvear esq. Necochea')).toBe('Alvear y Necochea');
+    });
   });
 });
