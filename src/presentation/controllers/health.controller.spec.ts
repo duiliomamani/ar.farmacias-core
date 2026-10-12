@@ -19,7 +19,7 @@ describe('HealthController', () => {
   it('should return health status', () => {
     const result = controller.check();
     expect(result.status).toBe('ok');
-    expect(result.service).toBe('ar.farmacias-core');
+    expect(result.service).toBe('condorjuy-api');
     expect(result.timestamp).toBeDefined();
   });
 });

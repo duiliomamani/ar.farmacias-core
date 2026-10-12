@@ -11,7 +11,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'ar.farmacias-core',
+      service: 'condorjuy-api',
     };
   }
 }
